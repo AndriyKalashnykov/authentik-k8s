@@ -29,21 +29,38 @@ func GetTLSTransport(insecure bool) http.RoundTripper {
 	}
 	return tlsTransport
 }
+
+func IntToPointer(in int) *int32 {
+	i := int32(in)
+	return &i
+}
+
+func BoolToPointer(in bool) *bool {
+	return &in
+}
+
 func main() {
 
 	config := api.NewConfiguration()
 	config.Debug = true
 	config.Scheme = "https"
-	config.Host = "localhost:9443"
+	config.Host = "172.18.255.202:9443"
 	config.HTTPClient = &http.Client{
 		Transport: GetTLSTransport(true),
 	}
 
-	//m := api.TokenRequest{
-	//	Identifier: d.Get("identifier").(string),
-	//	User:       intToPointer(d.Get("user").(int)),
-	//	Expiring:   boolToPointer(d.Get("expiring").(bool)),
-	//}
+	identifier := "id"
+	user := 1
+	expiring := false
+
+	tokenRequest := api.TokenRequest{
+		Identifier: identifier,
+		User:       IntToPointer(user),
+		Expiring:   BoolToPointer(expiring),
+	}
+
+	fmt.Println(tokenRequest)
+
 	//config.AddDefaultHeader("Authorization", fmt.Sprintf("Bearer %s", token))
 
 	apiClient := api.NewAPIClient(config)
