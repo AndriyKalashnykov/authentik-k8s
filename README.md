@@ -15,4 +15,15 @@ docker-compose pull
 docker-compose up
 
 https://localhost:9443/if/flow/initial-setup/
+
+
+docker-compose down --volumes
+rm -rf certs/
+rm -rf custom-templates/
+rm -rf media/
+
 ```
+
+# Client
+
+https://github.com/goauthentik/terraform-provider-authentik/blob/fd45b0834275920ebccf57901d2ad4cc4bf2ef6d/internal/provider/provider.go#L230

@@ -1,0 +1,22 @@
+authentik:
+    secret_key: "PleaseGenerateA50CharKey"
+    # This sends anonymous usage-data, stack traces on errors and
+    # performance data to sentry.io, and is fully opt-in
+    error_reporting:
+        enabled: false
+    postgresql:
+        password: "ThisIsNotASecurePassword"
+
+ingress:
+    enabled: true
+    hosts:
+        - host: authentik.domain.tld
+          paths:
+              - path: "/"
+                pathType: Prefix
+
+postgresql:
+    enabled: true
+    postgresqlPassword: "ThisIsNotASecurePassword"
+redis:
+    enabled: true
