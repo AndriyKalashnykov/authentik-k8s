@@ -24,6 +24,17 @@ rm -rf media/
 
 ```
 
-# Client
+## Client
 
 https://github.com/goauthentik/terraform-provider-authentik/blob/fd45b0834275920ebccf57901d2ad4cc4bf2ef6d/internal/provider/provider.go#L230
+
+
+## K8s
+
+```bash
+kubectl create ingress demo-localhost --class=nginx --rule="authentik.domain.tld/*=authentik:80"
+
+kubectl patch svc ak-outpost-authentik-embedded-outpost -n default --type='json' -p "[{\"op\":\"replace\",\"path\":\"/spec/type\",\"value\":\"LoadBalancer\"}]"
+echo "waiting for ak-outpost-authentik-embedded-outpost to get External-IP"
+until kubectl get service/ak-outpost-authentik-embedded-outpost -n default --output=jsonpath='{.status.loadBalancer}' | grep "ingress"; do : ; done
+```
