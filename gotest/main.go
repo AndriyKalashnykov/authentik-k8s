@@ -30,12 +30,16 @@ func BoolToPointer(in bool) *bool {
 	return &in
 }
 
+func StringToPointer(in string) *string {
+	return &in
+}
+
 func main() {
 
 	config := api.NewConfiguration()
 	config.Debug = true
-	config.Scheme = "https"
-	config.Host = "172.18.255.202:9443"
+	config.Scheme = "http"
+	config.Host = "172.18.255.200:80"
 	config.HTTPClient = &http.Client{
 		Transport: GetTLSTransport(true),
 	}
@@ -55,7 +59,7 @@ func main() {
 	//
 	//fmt.Println(tokenRequest)
 
-	token := "ak-outpost-b253971d-d4f5-4ae0-bf5a-cfe854c02462-api"
+	token := "NoMlxBQuYgfu3j19ygGqhjXenAjrJgOfN5naqmSDBUhdLjYqHKze7yyzY07H"
 	config.AddDefaultHeader("Authorization", fmt.Sprintf("Bearer %s", token))
 
 	apiClient := api.NewAPIClient(config)
@@ -67,15 +71,32 @@ func main() {
 	//}
 	//fmt.Fprintf(os.Stdout, "Response from `AdminApi.AdminAppsList`: %v\n", rootConfig)
 
-	list, rsp, err := apiClient.Oauth2Api.Oauth2AuthorizationCodesList(context.Background()).Execute()
-	fmt.Fprintf(os.Stdout, "list`: %v\n", list)
-	fmt.Fprintf(os.Stdout, "rsp`: %v\n", rsp)
+	//list, rsp, err := apiClient.Oauth2Api.Oauth2AuthorizationCodesList(context.Background()).Execute()
+	//if err != nil {
+	//	fmt.Fprintf(os.Stdout, "list`: %v\n", list)
+	//	fmt.Fprintf(os.Stdout, "rsp`: %v\n", rsp)
+	//}
 
-	resp, r, err := apiClient.AdminApi.AdminAppsList(context.Background()).Execute()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error when calling `AdminApi.AdminAppsList``: %v\n", err)
-		fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+	//resp, r, err := apiClient.AdminApi.AdminAppsList(context.Background()).Execute()
+	//if err != nil {
+	//	fmt.Fprintf(os.Stderr, "Error when calling `AdminApi.AdminAppsList``: %v\n", err)
+	//	fmt.Fprintf(os.Stderr, "Full HTTP response: %v\n", r)
+	//}
+	//// response from `AdminAppsList`: []App
+	//fmt.Fprintf(os.Stdout, "Response from `AdminApi.AdminAppsList`: %v\n", resp)
+
+	ur := api.UserRequest{
+		Name:     "name",
+		Username: "username",
+		Groups:   []string{"6f6342ecc47044fd977b1201c2b43d4c"}, // UID
+		IsActive: BoolToPointer(true),
+		Path:     StringToPointer("users"),
 	}
-	// response from `AdminAppsList`: []App
-	fmt.Fprintf(os.Stdout, "Response from `AdminApi.AdminAppsList`: %v\n", resp)
+
+	usr, res, err := apiClient.CoreApi.CoreUsersCreate(context.Background()).UserRequest(ur).Execute()
+	if err != nil {
+		fmt.Fprintf(os.Stdout, "usr``: %v\n", usr)
+		fmt.Fprintf(os.Stdout, "res``: %v\n", res)
+	}
+
 }
