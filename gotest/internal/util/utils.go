@@ -50,3 +50,18 @@ func StringToPointer(in string) *string {
 //}
 //// response from `AdminAppsList`: []App
 //fmt.Fprintf(os.Stdout, "Response from `AdminApi.AdminAppsList`: %v\n", resp)
+
+//identifier := "akadmin"
+//user := 1
+//expiring := false
+
+//tokenRequest := api.TokenRequest{
+//	Identifier: identifier,
+//	User:       IntToPointer(user),
+//	Expiring:   BoolToPointer(expiring),
+//}
+//
+//intent := api.IntentEnum(api.INTENTENUM_API)
+//tokenRequest.Intent = &intent
+//
+//fmt.Println(tokenRequest)

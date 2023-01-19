@@ -23,25 +23,30 @@ func CreateConfiguration(scheme string, host string, token string) *api.Configur
 	return config
 }
 
-func CreateGroup(apiClient *api.APIClient, name string) (*api.Group, *http.Response, error) {
+func CreateGroup(ctx context.Context, apiClient *api.APIClient, name string) (*api.Group, *http.Response, error) {
 
-	groupRequest := api.GroupRequest{
+	return apiClient.CoreApi.CoreGroupsCreate(ctx).GroupRequest(api.GroupRequest{
 		Name:        name,
 		IsSuperuser: util.BoolToPointer(false),
-	}
-
-	return apiClient.CoreApi.CoreGroupsCreate(context.Background()).GroupRequest(groupRequest).Execute()
+	}).Execute()
 }
 
-func CreateUser(apiClient *api.APIClient, groupUID string) (*api.User, *http.Response, error) {
+func CreateUser(ctx context.Context, apiClient *api.APIClient, groupUID string, userName string, path string) (*api.User, *http.Response, error) {
 
-	userRequest := api.UserRequest{
-		Name:     "name",
-		Username: "username",
+	return apiClient.CoreApi.CoreUsersCreate(ctx).UserRequest(api.UserRequest{
+		Name:     userName,
+		Username: userName,
 		Groups:   []string{groupUID}, // UID
 		IsActive: util.BoolToPointer(true),
-		Path:     util.StringToPointer("users"),
-	}
+		Path:     util.StringToPointer(path),
+	}).Execute()
+}
 
-	return apiClient.CoreApi.CoreUsersCreate(context.Background()).UserRequest(userRequest).Execute()
+func UpdateUserPassword(ctx context.Context, apiClient *api.APIClient, userID int32, pwd string) (*http.Response, error) {
+
+	passwordRequest := apiClient.CoreApi.CoreUsersSetPasswordCreate(ctx, userID).UserPasswordSetRequest(api.UserPasswordSetRequest{
+		Password: pwd,
+	})
+
+	return apiClient.CoreApi.CoreUsersSetPasswordCreateExecute(passwordRequest)
 }
