@@ -10,7 +10,7 @@ import (
 
 const AuthentikServerScheme = "https"
 const AuthentikServerHost = "172.18.255.200:443"
-const AuthentikBootstrapToken = "NoMlxBQuYgfu3j19ygGqhjXenAjrJgOfN5naqmSDBUhdLjYqHKze7yyzY07H"
+const AuthentikBootstrapToken = "NoMlxBQuYgfu3j19ygGqhjXenAjrJgOfN5naqmSDBUhdLjYqHKze7yyzY07H" // see AUTHENTIK_BOOTSTRAP_TOKEN in K8s manifests
 const QleetOSGroupName = "QleetOS"
 const QleetOSGroupIsSuperUser = false // can login to Authintic admin Web UI interface
 const QleetctlUser = "qleetctl"
