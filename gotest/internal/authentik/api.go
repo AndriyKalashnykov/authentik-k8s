@@ -23,11 +23,11 @@ func CreateConfiguration(scheme string, host string, token string) *api.Configur
 	return config
 }
 
-func CreateGroup(ctx context.Context, apiClient *api.APIClient, name string) (*api.Group, *http.Response, error) {
+func CreateGroup(ctx context.Context, apiClient *api.APIClient, name string, isSuperuser bool) (*api.Group, *http.Response, error) {
 
 	return apiClient.CoreApi.CoreGroupsCreate(ctx).GroupRequest(api.GroupRequest{
 		Name:        name,
-		IsSuperuser: util.BoolToPointer(false),
+		IsSuperuser: util.BoolToPointer(isSuperuser),
 	}).Execute()
 }
 
@@ -51,10 +51,28 @@ func UpdateUserPassword(ctx context.Context, apiClient *api.APIClient, userID in
 	return apiClient.CoreApi.CoreUsersSetPasswordCreateExecute(passwordRequest)
 }
 
-func CreateUserToken(ctx context.Context, apiClient *api.APIClient, userID int32, ) {
+func CreateUserToken(ctx context.Context, apiClient *api.APIClient, userID int32, tokenIdentifier string, tokenDescription string) (*api.Token, *http.Response, error) {
+	intent := api.IntentEnum(api.INTENTENUM_API)
 
+	tr := api.TokenRequest{
+		Identifier:  tokenIdentifier,
+		Intent:      &intent,
+		User:        util.Int32ToPointer(userID),
+		Description: util.StringToPointer(tokenDescription),
+		Expiring:    util.BoolToPointer(false),
+	}
+
+	return apiClient.CoreApi.CoreTokensCreate(ctx).TokenRequest(tr).Execute()
+}
+
+func RetrieveUserToken(ctx context.Context, apiClient *api.APIClient, tokenIdentifier string) (*api.TokenView, *http.Response, error) {
+	return apiClient.CoreApi.CoreTokensViewKeyRetrieveExecute(apiClient.CoreApi.CoreTokensViewKeyRetrieve(ctx, tokenIdentifier))
 }
 
 func ListUser(ctx context.Context, apiClient *api.APIClient, userName string) (*api.PaginatedUserList, *http.Response, error) {
 	return apiClient.CoreApi.CoreUsersList(ctx).Username(userName).Execute()
+}
+
+func MeRetrieveUser(ctx context.Context, apiClient *api.APIClient) (*api.SessionUser, *http.Response, error) {
+	return apiClient.CoreApi.CoreUsersMeRetrieveExecute(apiClient.CoreApi.CoreUsersMeRetrieve(ctx))
 }

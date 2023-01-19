@@ -9,55 +9,75 @@ import (
 )
 
 const AuthentikBootstrapToken = "NoMlxBQuYgfu3j19ygGqhjXenAjrJgOfN5naqmSDBUhdLjYqHKze7yyzY07H"
-const GroupName = "QleetOS"
+const QleetOSGroupName = "QleetOS"
+const QleetOSGroupIsSuperUser = false // can login to Authintic admin Web UI interface
 const QleetctlUser = "qleetctl"
 const QleetctlUserPwd = "Qleetctl1234567890!"
 const UsersPath = "users"
+const QleetctlTokenIdentifier = "qleetctl-token"
+const QleetctlTokenIdentifierDescription = "qleetctl-token created with authentik/go-client"
 
 func main() {
 	ctx := context.Background()
 
+	// create authentic API client using AuthentikBootstrapToken used during Authentik deployment
 	akadminConfig := authentik.CreateConfiguration("https", "172.18.255.200:443", AuthentikBootstrapToken)
 	akadminApiClient := api.NewAPIClient(akadminConfig)
 
-	create := false
-	if create {
-		// create a group
-		// will create new QleetOS with different pk
-		grp, _, err := authentik.CreateGroup(ctx, akadminApiClient, GroupName)
-		if err != nil {
-			log.Panicf("error: %v", err)
-		}
-		groupUID := grp.Pk
-		log.Printf("groupUID``: %v\n", groupUID)
-
-		// create a user and include it to previously created group
-		usr, _, err := authentik.CreateUser(ctx, akadminApiClient, groupUID, QleetctlUser, UsersPath)
-		if err != nil {
-			log.Panicf("error: %v", err)
-		}
-		userUID := usr.Pk
-		log.Printf("userUID``: %v\n", userUID)
-
-		// create user's password
-		resp, err := authentik.UpdateUserPassword(ctx, akadminApiClient, userUID, QleetctlUserPwd)
-		if err != nil {
-			log.Panicf("error: %v", err)
-		}
-		if resp != nil {
-
-		}
+	// create a group
+	// will create new QleetOS with different pk
+	grp, _, err := authentik.CreateGroup(ctx, akadminApiClient, QleetOSGroupName, QleetOSGroupIsSuperUser)
+	if err != nil {
+		log.Panicf("error: %v", err)
 	}
+	groupUID := grp.Pk
+	log.Printf("groupUID``: %v\n", groupUID)
 
-	// get user's Groups
-	pl, resp, err := authentik.ListUser(ctx, akadminApiClient, QleetctlUser)
+	// create a user and include it to previously created group
+	usr, _, err := authentik.CreateUser(ctx, akadminApiClient, groupUID, QleetctlUser, UsersPath)
+	if err != nil {
+		log.Panicf("error: %v", err)
+	}
+	userUID := usr.Pk
+	log.Printf("userUID``: %v\n", userUID)
+
+	// create user's password
+	resp, err := authentik.UpdateUserPassword(ctx, akadminApiClient, userUID, QleetctlUserPwd)
 	if err != nil {
 		log.Panicf("error: %v", err)
 	}
 	if resp != nil {
-		users := pl.GetResults()
-		if pl != nil {
-			log.Printf("Groups: %v", users[0].Groups)
-		}
+
+	}
+
+	// create Oauth token
+	token, resp, err := authentik.CreateUserToken(ctx, akadminApiClient, userUID, QleetctlTokenIdentifier, QleetctlTokenIdentifierDescription)
+	if err != nil {
+		log.Panicf("error: %v", err)
+	}
+	if token != nil {
+		log.Printf("Token: %v", token.Pk)
+	}
+
+	// retrieve Oauth token
+	tv, _, err := authentik.RetrieveUserToken(ctx, akadminApiClient, QleetctlTokenIdentifier)
+	if err != nil {
+		log.Panicf("error: %v", err)
+	}
+	if tv != nil {
+		log.Printf("Oauth token: %v", tv.Key)
+	}
+
+	// create authentic API client using qleetctl Oauth token (tv.Key) from previous step
+	qleetctlConfig := authentik.CreateConfiguration("https", "172.18.255.200:443", tv.Key)
+	qleetctlApiClient := api.NewAPIClient(qleetctlConfig)
+
+	// get qleetctl own user's info
+	su, _, err := authentik.MeRetrieveUser(ctx, qleetctlApiClient)
+	if err != nil {
+		log.Panicf("error: %v", err)
+	}
+	if su != nil {
+		log.Printf("User Groups: %v", su.GetUser().Groups)
 	}
 }
