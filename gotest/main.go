@@ -8,6 +8,8 @@ import (
 	api "goauthentik.io/api/v3"
 )
 
+const AuthentikServerScheme = "https"
+const AuthentikServerHost = "172.18.255.200:443"
 const AuthentikBootstrapToken = "NoMlxBQuYgfu3j19ygGqhjXenAjrJgOfN5naqmSDBUhdLjYqHKze7yyzY07H"
 const QleetOSGroupName = "QleetOS"
 const QleetOSGroupIsSuperUser = false // can login to Authintic admin Web UI interface
@@ -21,7 +23,8 @@ func main() {
 	ctx := context.Background()
 
 	// create authentic API client using AuthentikBootstrapToken used during Authentik deployment
-	akadminConfig := authentik.CreateConfiguration("https", "172.18.255.200:443", AuthentikBootstrapToken)
+
+	akadminConfig := authentik.CreateConfiguration(AuthentikServerScheme, AuthentikServerHost, AuthentikBootstrapToken)
 	akadminApiClient := api.NewAPIClient(akadminConfig)
 
 	// create a group
@@ -69,7 +72,7 @@ func main() {
 	}
 
 	// create authentic API client using qleetctl Oauth token (tv.Key) from previous step
-	qleetctlConfig := authentik.CreateConfiguration("https", "172.18.255.200:443", tv.Key)
+	qleetctlConfig := authentik.CreateConfiguration(AuthentikServerScheme, AuthentikServerHost, tv.Key)
 	qleetctlApiClient := api.NewAPIClient(qleetctlConfig)
 
 	// get qleetctl own user's info
