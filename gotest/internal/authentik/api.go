@@ -51,6 +51,10 @@ func UpdateUserPassword(ctx context.Context, apiClient *api.APIClient, userID in
 	return apiClient.CoreApi.CoreUsersSetPasswordCreateExecute(passwordRequest)
 }
 
+func CreateUserToken(ctx context.Context, apiClient *api.APIClient, userID int32, ) {
+
+}
+
 func ListUser(ctx context.Context, apiClient *api.APIClient, userName string) (*api.PaginatedUserList, *http.Response, error) {
 	return apiClient.CoreApi.CoreUsersList(ctx).Username(userName).Execute()
 }
