@@ -1,40 +1,82 @@
-https://goauthentik.io/docs/installation/docker-compose
-https://github.com/goauthentik/authentik/tags
+# authentik-k8s
 
-```bash
-# You can also use openssl instead: `openssl rand -base64 36`
-# sudo apt-get install -y pwgen
-# Because of a PostgreSQL limitation, only passwords up to 99 chars are supported
-# See https://www.postgresql.org/message-id/09512C4F-8CB9-4021-B455-EF4C4F0D55A0@amazon.com
-# echo "PG_PASS=$(pwgen -s 40 1)" >> .env
-# echo "AUTHENTIK_SECRET_KEY=$(pwgen -s 50 1)" >> .env
-# # Skip if you don't want to enable error reporting
-# echo "AUTHENTIK_ERROR_REPORTING__ENABLED=true" >> .env
-
-docker-compose pull
-docker-compose up
-
-https://localhost:9443/if/flow/initial-setup/
-
-
-docker-compose down --volumes
-rm -rf certs/
-rm -rf custom-templates/
-rm -rf media/
-
-```
-
-## Client
-
-https://github.com/goauthentik/terraform-provider-authentik/blob/fd45b0834275920ebccf57901d2ad4cc4bf2ef6d/internal/provider/provider.go#L230
-
+authentik
 
 ## K8s
 
-```bash
-kubectl create ingress demo-localhost --class=nginx --rule="authentik.domain.tld/*=authentik:80"
+### Deploy on K8s
 
-kubectl patch svc ak-outpost-authentik-embedded-outpost -n default --type='json' -p "[{\"op\":\"replace\",\"path\":\"/spec/type\",\"value\":\"LoadBalancer\"}]"
-echo "waiting for ak-outpost-authentik-embedded-outpost to get External-IP"
-until kubectl get service/ak-outpost-authentik-embedded-outpost -n default --output=jsonpath='{.status.loadBalancer}' | grep "ingress"; do : ; done
+Authentik manifests already generated with Authentik Helm chart and configures with `AUTHENTIK_BOOTSTRAP_PASSWORD` and `AUTHENTIK_BOOTSTRAP_TOKEN` if you need 
+to change them see next chapter first.
+
+Execute script to deploy manifests and open browser window, login: `akadmin`, pwd: `Authentik01234567890!`
+
+```bash
+./scripts/deploy-authentik-k8s.sh
+```
+
+## Create Authentik k8s manifests using Helm
+
+```bash
+helm repo add authentik https://charts.goauthentik.io
+helm repo update
+
+helm template authentik authentik/authentik -f ./values.yml > deploy.yml
+helm upgrade --install authentik authentik/authentik -f values.yml
+```
+
+Edit `deploy.yml` ->  Deployment `authentik-server`
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authentik-server
+  ...
+spec:
+  ...
+  template:
+    ...
+    spec:
+      containers:
+        - name: authentik
+          ...
+          env:            
+            ...
+            - name: AUTHENTIK_BOOTSTRAP_PASSWORD
+              value: "Authentik01234567890!"
+            - name: AUTHENTIK_BOOTSTRAP_TOKEN
+              value: "NoMlxBQuYgfu3j19ygGqhjXenAjrJgOfN5naqmSDBUhdLjYqHKze7yyzY07H"
+```
+
+Edit `deploy.yml` ->  Deployment `authentik-worker`
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authentik-worker
+  ...
+spec:
+  ...
+  template:
+    ...
+    spec:
+      ...
+      containers:
+        - name: authentik
+          ...
+          env:            
+            ...
+            - name: AUTHENTIK_BOOTSTRAP_PASSWORD
+              value: "Authentik01234567890!"
+            - name: AUTHENTIK_BOOTSTRAP_TOKEN
+              value: "NoMlxBQuYgfu3j19ygGqhjXenAjrJgOfN5naqmSDBUhdLjYqHKze7yyzY07H"
+```
+
+
+## Docker Compose
+
+### Run using docker-compose
+
+```bash
+./scripts/start-docker-compose-authentik.sh
 ```

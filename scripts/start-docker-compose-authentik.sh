@@ -4,6 +4,14 @@ LAUNCH_DIR=$(pwd); SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; c
 
 cd $SCRIPT_PARENT_DIR
 
+docker-compose down --volumes
+rm -rf certs/
+rm -rf custom-templates/
+rm -rf media/
 
+docker-compose pull
+docker-compose up
+
+xdg-open https://localhost:9443/if/flow/initial-setup/
 
 cd $LAUNCH_DIR
