@@ -31,7 +31,10 @@ helm template authentik authentik/authentik -f ./values.yml > deploy.yml
 helm upgrade --install authentik authentik/authentik -f values.yml
 ```
 
-Edit `deploy.yml` ->  Deployment `authentik-server`
+If you want to set predefined `password` and `token` for the default admin user `akadmin`:
+
+edit `deploy.yml` ->  Deployment `authentik-server`
+
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -54,7 +57,8 @@ spec:
               value: "NoMlxBQuYgfu3j19ygGqhjXenAjrJgOfN5naqmSDBUhdLjYqHKze7yyzY07H"
 ```
 
-Edit `deploy.yml` ->  Deployment `authentik-worker`
+edit `deploy.yml` ->  Deployment `authentik-worker`
+
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -77,7 +81,6 @@ spec:
             - name: AUTHENTIK_BOOTSTRAP_TOKEN
               value: "NoMlxBQuYgfu3j19ygGqhjXenAjrJgOfN5naqmSDBUhdLjYqHKze7yyzY07H"
 ```
-
 
 ## Docker Compose
 
