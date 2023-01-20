@@ -3,7 +3,7 @@
 POC for [Authentik](https://goauthentik.io/) [Go client library](https://github.com/goauthentik/client-go)
 
 - K8s deployment
-- [gotest](/gotest), POC project utilizing [`goauthentik/client-go`](https://github.com/goauthentik/client-go)
+- [gotest](/gotest), POC project utilizing [goauthentik/client-go](https://github.com/goauthentik/client-go)
   - create Group
   - create User
   - create User password
