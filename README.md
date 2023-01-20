@@ -4,9 +4,9 @@
 - [gotest](/gotest), POC project utilizing [goauthentik/client-go](https://github.com/goauthentik/client-go)
   - create Group
   - create User
-  - create User password
-  - create User OAuth token
-  - get User Groups using generate OAuth token
+  - create User's password
+  - create User's OAuth token
+  - get User's Groups (using User's OAuth token)
 
 ## K8s
 
