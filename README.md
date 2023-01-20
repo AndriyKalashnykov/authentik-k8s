@@ -1,6 +1,4 @@
-# authentik-k8s
-
-POC for [Authentik](https://goauthentik.io/) [Go client library](https://github.com/goauthentik/client-go)
+# POC for [Authentik](https://goauthentik.io/) [Go client library](https://github.com/goauthentik/client-go)
 
 - K8s deployment
 - [gotest](/gotest), POC project utilizing [goauthentik/client-go](https://github.com/goauthentik/client-go)
