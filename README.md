@@ -8,6 +8,21 @@
   - create User's OAuth token
   - get User's Groups (using User's OAuth token)
 
+## Requirements
+
+- [gvm](https://github.com/moovweb/gvm) Go 1.19
+    ```bash
+    gvm install go1.19 --prefer-binary --with-build-tools --with-protobuf
+    gvm use go1.19 --default
+    ```
+- [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation)
+- [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
+- [docker](https://docs.docker.com/get-docker/)
+- [docker-compose](https://docs.docker.com/compose/install/)
+  ```bash
+  sudo apt-get install -y docker-compose
+  ```
+
 ## K8s
 
 ### Deploy on K8s
@@ -88,4 +103,11 @@ spec:
 
 ```bash
 ./scripts/start-docker-compose-authentik.sh
+```
+
+## Run POC 
+
+```bash
+cd gotest
+make run
 ```

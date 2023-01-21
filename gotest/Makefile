@@ -13,10 +13,10 @@ test:
 	@go generate
 	@export GOFLAGS=$(GOFLAGS); export TZ="UTC"; go test -v ./...
 
+#run: @ Run Authentik POC
+run:
+	@export GOFLAGS=$(GOFLAGS); export TZ="UTC"; go run main.go
+
 #update: @ Update dependencies to latest versions
 update:
 	@export GOFLAGS=$(GOFLAGS); go get -u ./...; go mod tidy
-
-#jwt-create: @ Create JWT file
-jwt-create:
-	./jwt-create.sh
