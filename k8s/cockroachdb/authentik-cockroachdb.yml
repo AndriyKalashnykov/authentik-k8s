@@ -377,17 +377,17 @@ spec:
       priorityClassName: 
       securityContext:
         {}
-#      initContainers:
-#        - name: db-init
-#          image: cockroachdb/cockroach:v22.2.2
-#          imagePullPolicy: "IfNotPresent"
-#          command:
-#            - "bash"
-#            - "-c"
-#            - "cockroach sql --insecure --host crdb-public.threeport-api --port 26257 -f /etc/threeport/db-create/db.sql"
-#          volumeMounts:
-#            - name: db-create
-#              mountPath: "/etc/threeport/db-create"
+     initContainers:
+       - name: db-init
+         image: cockroachdb/cockroach:v22.2.2
+         imagePullPolicy: "IfNotPresent"
+         command:
+           - "bash"
+           - "-c"
+           - "cockroach sql --insecure --host crdb-public.threeport-api --port 26257 -f /etc/threeport/db-create/db.sql"
+         volumeMounts:
+           - name: db-create
+             mountPath: "/etc/threeport/db-create"
       containers:
         - name: authentik
           image: "ghcr.io/goauthentik/server:2023.1.0"
@@ -496,17 +496,17 @@ spec:
       priorityClassName: 
       securityContext:
         {}
-#      initContainers:
-#        - name: db-init
-#          image: cockroachdb/cockroach:v22.2.2
-#          imagePullPolicy: "IfNotPresent"
-#          command:
-#            - "bash"
-#            - "-c"
-#            - "cockroach sql --insecure --host crdb-public.threeport-api --port 26257 -f /etc/threeport/db-create/db.sql"
-#          volumeMounts:
-#            - name: db-create
-#              mountPath: "/etc/threeport/db-create"
+     initContainers:
+       - name: db-init
+         image: cockroachdb/cockroach:v22.2.2
+         imagePullPolicy: "IfNotPresent"
+         command:
+           - "bash"
+           - "-c"
+           - "cockroach sql --insecure --host crdb-public.threeport-api --port 26257 -f /etc/threeport/db-create/db.sql"
+         volumeMounts:
+           - name: db-create
+             mountPath: "/etc/threeport/db-create"
       containers:
         - name: authentik
           image: "ghcr.io/goauthentik/server:2023.1.0"
