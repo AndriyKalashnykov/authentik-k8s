@@ -13,6 +13,8 @@ data:
         encoding='utf-8'
     ;
     GRANT ALL ON DATABASE threeport_api TO tp_rest_api;
+
+
 ---
 # Source: authentik/charts/redis/templates/serviceaccount.yaml
 apiVersion: v1

@@ -110,7 +110,7 @@ kubectl create ns threeport-api
 
 # deploy cockroachdb
 kubectl apply -f ./k8s/cockroachdb/cockroachdb.yml
-echo "waiting forcockroachdb to get ready"
+echo "waiting for cockroachdb to get ready"
 kubectl wait pod -n threeport-api crdb-0 --for condition=Ready --timeout=180s
 
 # deploy authentik
