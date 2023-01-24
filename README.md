@@ -99,18 +99,30 @@ spec:
 ### CockroachDB
 
 ```bash
+# create manifests if needed
 helm template crdb cockroachdb/cockroachdb --namespace default \
 --set fullnameOverride=crdb \
 --set single-node=true \
 --set statefulset.replicas=1 > ./k8s/cockroachdb/cockroachdb.yml
 
+# create namespace
 kubectl create ns threeport-api
 
+# deploy cockroachdb
 kubectl apply -f ./k8s/cockroachdb/cockroachdb.yml
-kubectl apply -f ./k8s/cockroachdb/authentik-cockroachdb.yml
+echo "waiting forcockroachdb to get ready"
+kubectl wait pod -n threeport-api crdb-0 --for condition=Ready --timeout=180s
 
+# deploy authentik
+kubectl apply -f ./k8s/cockroachdb/authentik-cockroachdb.yml
+kubectl apply -f ./k8s/cockroachdb/crdb-test-pod.yml
+
+# undeploy authentik
 kubectl delete -f ./k8s/cockroachdb/authentik-cockroachdb.yml
+
+# undeploy cockroachdb
 kubectl delete -f ./k8s/cockroachdb/cockroachdb.yml
+kubectl delete -f ./k8s/cockroachdb/crdb-test-pod.yml
 ```
 
 ## Docker Compose

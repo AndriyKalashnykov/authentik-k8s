@@ -1,0 +1,23 @@
+kind: Pod
+apiVersion: v1
+metadata:
+  name: crdb-test
+  namespace: "threeport-api"
+  annotations:
+    helm.sh/hook: test-success
+spec:
+  restartPolicy: Never
+  containers:
+    - name: client-test
+      image: "cockroachdb/cockroach:v22.2.2"
+      imagePullPolicy: "IfNotPresent"
+      command:
+        - /cockroach/cockroach
+        - sql
+        - --insecure
+        - --host
+        - crdb-public.threeport-api
+        - --port
+        - "26257"
+        - -e
+        - SHOW DATABASES;

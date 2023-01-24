@@ -13,8 +13,6 @@ data:
         encoding='utf-8'
     ;
     GRANT ALL ON DATABASE threeport_api TO tp_rest_api;
-
-
 ---
 # Source: authentik/charts/redis/templates/serviceaccount.yaml
 apiVersion: v1
@@ -379,17 +377,17 @@ spec:
       priorityClassName: 
       securityContext:
         {}
-      initContainers:
-        - name: db-init
-          image: cockroachdb/cockroach:v22.2.2
-          imagePullPolicy: "IfNotPresent"
-          command:
-            - "bash"
-            - "-c"
-            - "cockroach sql --insecure --host crdb --port 26257 -f /etc/threeport/db-create/db.sql"
-          volumeMounts:
-            - name: db-create
-              mountPath: "/etc/threeport/db-create"
+#      initContainers:
+#        - name: db-init
+#          image: cockroachdb/cockroach:v22.2.2
+#          imagePullPolicy: "IfNotPresent"
+#          command:
+#            - "bash"
+#            - "-c"
+#            - "cockroach sql --insecure --host crdb-public.threeport-api --port 26257 -f /etc/threeport/db-create/db.sql"
+#          volumeMounts:
+#            - name: db-create
+#              mountPath: "/etc/threeport/db-create"
       containers:
         - name: authentik
           image: "ghcr.io/goauthentik/server:2023.1.0"
@@ -419,7 +417,7 @@ spec:
             - name: AUTHENTIK_OUTPOSTS__CONTAINER_IMAGE_BASE
               value: "ghcr.io/goauthentik/%(type)s:%(version)s"
             - name: AUTHENTIK_POSTGRESQL__HOST
-              value: "crdb"
+              value: "crdb-public"
             - name: AUTHENTIK_POSTGRESQL__NAME
               value: "threeport_api"
             - name: AUTHENTIK_POSTGRESQL__PASSWORD
@@ -498,17 +496,17 @@ spec:
       priorityClassName: 
       securityContext:
         {}
-      initContainers:
-        - name: db-init
-          image: cockroachdb/cockroach:v22.2.2
-          imagePullPolicy: "IfNotPresent"
-          command:
-            - "bash"
-            - "-c"
-            - "cockroach sql --insecure --host crdb --port 26257 -f /etc/threeport/db-create/db.sql"
-          volumeMounts:
-            - name: db-create
-              mountPath: "/etc/threeport/db-create"
+#      initContainers:
+#        - name: db-init
+#          image: cockroachdb/cockroach:v22.2.2
+#          imagePullPolicy: "IfNotPresent"
+#          command:
+#            - "bash"
+#            - "-c"
+#            - "cockroach sql --insecure --host crdb-public.threeport-api --port 26257 -f /etc/threeport/db-create/db.sql"
+#          volumeMounts:
+#            - name: db-create
+#              mountPath: "/etc/threeport/db-create"
       containers:
         - name: authentik
           image: "ghcr.io/goauthentik/server:2023.1.0"
@@ -538,15 +536,15 @@ spec:
             - name: AUTHENTIK_OUTPOSTS__CONTAINER_IMAGE_BASE
               value: "ghcr.io/goauthentik/%(type)s:%(version)s"
             - name: AUTHENTIK_POSTGRESQL__HOST
-              value: "authentik-postgresql"
+              value: "crdb-public"
             - name: AUTHENTIK_POSTGRESQL__NAME
-              value: "authentik"
+              value: "threeport_api"
             - name: AUTHENTIK_POSTGRESQL__PASSWORD
-              value: "ThisIsNotASecurePassword"
+              value: "tp-rest-api-pwd"
             - name: AUTHENTIK_POSTGRESQL__PORT
-              value: "5432"
+              value: "26257"
             - name: AUTHENTIK_POSTGRESQL__USER
-              value: "authentik"
+              value: "tp_rest_api"
             - name: AUTHENTIK_REDIS__HOST
               value: "authentik-redis-master"
             - name: AUTHENTIK_SECRET_KEY
