@@ -154,9 +154,9 @@ psycopg2.errors.UndefinedFunction: unknown function: pg_advisory_lock(): functio
 
 Root cause: `psycopg2.errors.UndefinedFunction: unknown function: pg_advisory_lock(): function undefined`
 
-[sql: fill out pg_advisory_lock stubs](https://github.com/cockroachdb/cockroach/issues/13546)
-[CockroachDB does not support pg_advisory_loc() function today](https://github.com/golang-migrate/migrate/issues/703)
-[Support for CockroachDB](https://github.com/goharbor/harbor/issues/8649)
+- [sql: fill out pg_advisory_lock stubs](https://github.com/cockroachdb/cockroach/issues/13546)
+- [CockroachDB does not support pg_advisory_loc() function today](https://github.com/golang-migrate/migrate/issues/703)
+- [Support for CockroachDB](https://github.com/goharbor/harbor/issues/8649)
 
 
 ## Docker Compose
