@@ -4,7 +4,7 @@ LAUNCH_DIR=$(pwd); SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; c
 
 cd $SCRIPT_PARENT_DIR
 
-kubectl apply -f ./k8s/deploy.yml
+kubectl apply -f ./k8s/postgresql/authentik-postgresql.yml
 
 echo "getting an External IP for Authentic svc"
 kubectl patch svc authentik -n default --type='json' -p "[{\"op\":\"replace\",\"path\":\"/spec/type\",\"value\":\"LoadBalancer\"}]"

@@ -25,7 +25,7 @@
 
 ## K8s
 
-### Deploy on K8s
+### Deploy on K8s (PostgreSQL)
 
 Authentik manifests already generated with Authentik Helm chart and configures with `AUTHENTIK_BOOTSTRAP_PASSWORD` and `AUTHENTIK_BOOTSTRAP_TOKEN` if you need 
 to change them see next chapter first.
@@ -42,8 +42,7 @@ Execute script to deploy manifests and open browser window, login: `akadmin`, pw
 helm repo add authentik https://charts.goauthentik.io
 helm repo update
 
-helm template authentik authentik/authentik -f ./values.yml > deploy.yml
-helm upgrade --install authentik authentik/authentik -f values.yml
+helm template authentik authentik/authentik -f ./k8s/postgresql/values.yml > ./k8s/postgresql/authentik-postgresql.yml
 ```
 
 If you want to set predefined `password` and `token` for the default admin user `akadmin`:
@@ -95,6 +94,23 @@ spec:
               value: "Authentik01234567890!"
             - name: AUTHENTIK_BOOTSTRAP_TOKEN
               value: "NoMlxBQuYgfu3j19ygGqhjXenAjrJgOfN5naqmSDBUhdLjYqHKze7yyzY07H"
+```
+
+### CockroachDB
+
+```bash
+helm template crdb cockroachdb/cockroachdb --namespace default \
+--set fullnameOverride=crdb \
+--set single-node=true \
+--set statefulset.replicas=1 > ./k8s/cockroachdb/cockroachdb.yml
+
+kubectl create ns threeport-api
+
+kubectl apply -f ./k8s/cockroachdb/cockroachdb.yml
+kubectl apply -f ./k8s/cockroachdb/authentik-cockroachdb.yml
+
+kubectl delete -f ./k8s/cockroachdb/authentik-cockroachdb.yml
+kubectl delete -f ./k8s/cockroachdb/cockroachdb.yml
 ```
 
 ## Docker Compose
