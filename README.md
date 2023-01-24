@@ -125,6 +125,40 @@ kubectl delete -f ./k8s/cockroachdb/cockroachdb.yml
 kubectl delete -f ./k8s/cockroachdb/crdb-test-pod.yml
 ```
 
+### Python/CockroachDB error
+
+```log
+✔ 14:31 ~/projects/authentik-k8s [ main|✚ 1] $ k logs -n threeport-api authentik-server-5cc447f9fb-8wwv2 
+Defaulted container "authentik" out of: authentik, db-init (init)
+{"event": "Loaded config", "level": "debug", "logger": "authentik.lib.config", "timestamp": 1674588685.27217, "file": "/authentik/lib/default.yml"}
+{"event": "Loaded environment variables", "level": "debug", "logger": "authentik.lib.config", "timestamp": 1674588685.2725286, "count": 46}
+{"event": "Starting authentik bootstrap", "level": "info", "logger": "authentik.lib.config", "timestamp": 1674588685.2726445}
+{"event": "PostgreSQL connection successful", "level": "info", "logger": "authentik.lib.config", "timestamp": 1674588685.2753716}
+{"event": "Redis Connection successful", "level": "info", "logger": "authentik.lib.config", "timestamp": 1674588685.27696}
+{"event": "Finished authentik bootstrap", "level": "info", "logger": "authentik.lib.config", "timestamp": 1674588685.276978}
+{"event": "Bootstrap completed", "level": "info", "logger": "bootstrap"}
+{"event": "Loaded config", "level": "debug", "logger": "authentik.lib.config", "timestamp": 1674588685.4033535, "file": "/authentik/lib/default.yml"}
+{"event": "Loaded environment variables", "level": "debug", "logger": "authentik.lib.config", "timestamp": 1674588685.4036634, "count": 46}
+2023-01-24 19:31:25 [info     ] applying django migrations
+2023-01-24 19:31:25 [info     ] waiting to acquire database lock
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "/lifecycle/migrate.py", line 83, in <module>
+    wait_for_lock()
+  File "/lifecycle/migrate.py", line 40, in wait_for_lock
+    curr.execute("SELECT pg_advisory_lock(%s)", (ADV_LOCK_UID,))
+psycopg2.errors.UndefinedFunction: unknown function: pg_advisory_lock(): function undefined
+
+```
+
+Root cause: `psycopg2.errors.UndefinedFunction: unknown function: pg_advisory_lock(): function undefined`
+
+[sql: fill out pg_advisory_lock stubs](https://github.com/cockroachdb/cockroach/issues/13546)
+[CockroachDB does not support pg_advisory_loc() function today](https://github.com/golang-migrate/migrate/issues/703)
+[Support for CockroachDB](https://github.com/goharbor/harbor/issues/8649)
+
+
 ## Docker Compose
 
 ### Run using docker-compose
