@@ -96,7 +96,7 @@ spec:
               value: "NoMlxBQuYgfu3j19ygGqhjXenAjrJgOfN5naqmSDBUhdLjYqHKze7yyzY07H"
 ```
 
-### CockroachDB
+### ### Deploy on K8s (CockroachDB, experimental, not working yet)
 
 ```bash
 # create manifests if needed
