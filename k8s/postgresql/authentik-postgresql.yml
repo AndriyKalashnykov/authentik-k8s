@@ -1,4 +1,9 @@
 ---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: threeport-api
+---
 # Source: authentik/charts/redis/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
@@ -17,7 +22,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: authentik
-  namespace: default
+  namespace: "threeport-api"
 ---
 # Source: authentik/charts/postgresql/templates/secrets.yaml
 apiVersion: v1
@@ -29,7 +34,7 @@ metadata:
     helm.sh/chart: postgresql-10.16.2
     app.kubernetes.io/instance: authentik
     app.kubernetes.io/managed-by: Helm
-  namespace: default
+  namespace: "threeport-api"
 type: Opaque
 data:
   postgresql-postgres-password: "aHQwcHp0Y1JUZQ=="
@@ -264,7 +269,7 @@ roleRef:
 subjects:
   - kind: ServiceAccount
     name: authentik
-    namespace: default
+    namespace: "threeport-api"
 ---
 # Source: authentik/charts/postgresql/templates/svc-headless.yaml
 apiVersion: v1
@@ -281,7 +286,7 @@ metadata:
     # field is broken in some versions of Kubernetes:
     # https://github.com/kubernetes/kubernetes/issues/58662
     service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
-  namespace: default
+  namespace: "threeport-api"
 spec:
   type: ClusterIP
   clusterIP: None
@@ -308,7 +313,7 @@ metadata:
     app.kubernetes.io/instance: authentik
     app.kubernetes.io/managed-by: Helm
   annotations:
-  namespace: default
+  namespace: "threeport-api"
 spec:
   type: ClusterIP
   ports:
@@ -372,11 +377,12 @@ apiVersion: v1
 kind: Service
 metadata:
   name: authentik
+  namespace: "threeport-api"
   labels:
     helm.sh/chart: authentik-2022.12.4
     app.kubernetes.io/name: authentik
     app.kubernetes.io/instance: authentik
-    app.kubernetes.io/version: "2023.1.0"
+    app.kubernetes.io/version: "2023.1.2"
     app.kubernetes.io/managed-by: Helm
 spec:
   type: ClusterIP
@@ -403,11 +409,12 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: authentik-server
+  namespace: "threeport-api"
   labels:
     helm.sh/chart: authentik-2022.12.4
     app.kubernetes.io/name: authentik
     app.kubernetes.io/instance: authentik
-    app.kubernetes.io/version: "2023.1.0"
+    app.kubernetes.io/version: "2023.1.2"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: "server"
 spec:
@@ -423,7 +430,7 @@ spec:
         app.kubernetes.io/name: authentik
         app.kubernetes.io/instance: authentik
         app.kubernetes.io/component: "server"
-        app.kubernetes.io/version: "2023.1.0"
+        app.kubernetes.io/version: "2023.1.2"
     spec:
       serviceAccountName: authentik
       enableServiceLinks: true
@@ -432,7 +439,7 @@ spec:
         {}
       containers:
         - name: authentik
-          image: "ghcr.io/goauthentik/server:2023.1.0"
+          image: "ghcr.io/goauthentik/server:2023.1.2"
           imagePullPolicy: "IfNotPresent"
           args: ["server"]
           env:            
@@ -507,11 +514,12 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: authentik-worker
+  namespace: "threeport-api"
   labels:
     helm.sh/chart: authentik-2022.12.4
     app.kubernetes.io/name: authentik
     app.kubernetes.io/instance: authentik
-    app.kubernetes.io/version: "2023.1.0"
+    app.kubernetes.io/version: "2023.1.2"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: "worker"
 spec:
@@ -527,7 +535,7 @@ spec:
         app.kubernetes.io/name: authentik
         app.kubernetes.io/instance: authentik
         app.kubernetes.io/component: "worker"
-        app.kubernetes.io/version: "2023.1.0"
+        app.kubernetes.io/version: "2023.1.2"
     spec:
       serviceAccountName: authentik
       enableServiceLinks: true
@@ -536,7 +544,7 @@ spec:
         {}
       containers:
         - name: authentik
-          image: "ghcr.io/goauthentik/server:2023.1.0"
+          image: "ghcr.io/goauthentik/server:2023.1.2"
           imagePullPolicy: "IfNotPresent"
           args: ["worker"]
           env:            
@@ -596,7 +604,7 @@ metadata:
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: primary
   annotations:
-  namespace: default
+  namespace: "threeport-api"
 spec:
   serviceName: authentik-postgresql-headless
   replicas: 1
@@ -898,7 +906,7 @@ metadata:
     helm.sh/chart: authentik-2022.12.4
     app.kubernetes.io/name: authentik
     app.kubernetes.io/instance: authentik
-    app.kubernetes.io/version: "2023.1.0"
+    app.kubernetes.io/version: "2023.1.2"
     app.kubernetes.io/managed-by: Helm
 spec:
   rules:
