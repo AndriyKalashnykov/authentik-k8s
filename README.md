@@ -169,7 +169,44 @@ Root cause: `psycopg2.errors.UndefinedFunction: unknown function: pg_advisory_lo
 
 ## Run POC 
 
+Run POC to perform following using [goauthentik/client-go](https://github.com/goauthentik/client-go)
+- create `qleetctl` user 
+- create `qleetctl` user's `passowrd` and `token`
+- create `QleetOS` group
+- assing `qleetctl` user to `QleetOS` group
+- use `qleetctl` user's `token` to find which groups it belong to
+
 ```bash
 cd gotest
 make run
 ```
+
+## Login to Authentik Web Admin inteface
+
+```bash
+LB_IP=$(kubectl get svc/authentik -o=jsonpath='{.status.loadBalancer.ingress[0].ip}')
+echo "login: akadmin, pwd: Authentik01234567890!"
+cd $LAUNCH_DIR
+xdg-open https://$LB_IP:443/if/admin/#/administration/overview
+```
+
+Login
+![](./docs/img/login.jpg "Login")
+
+Password
+![](./docs/img/password.jpg "Password")
+
+Users
+![](./docs/img/users.jpg "Users")
+
+User-Groups
+![](./docs/img/users-groups.jpg "User-Groups")
+
+Groups
+![](./docs/img/groups.jpg "Groups")
+
+Groups-User
+![](./docs/img/groups-users.jpg "Groups-User")
+
+Tokens
+![](./docs/img/tokens.jpg "Tokens")
