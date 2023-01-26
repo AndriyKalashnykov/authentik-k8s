@@ -62,7 +62,7 @@ func main() {
 		log.Printf("Token: %v", token.Pk)
 	}
 
-	// retrieve qleetctl user's OQuth token
+	// retrieve qleetctl user's OAuth token
 	tv, _, err := authentik.RetrieveUserToken(ctx, akadminApiClient, QleetctlTokenIdentifier)
 	if err != nil {
 		log.Panicf("error: %v", err)
