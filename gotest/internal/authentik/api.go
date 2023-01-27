@@ -69,6 +69,10 @@ func UpdateUserToken(ctx context.Context, apiClient *api.APIClient, tokenIdentif
 	return apiClient.CoreApi.CoreTokensSetKeyCreate(ctx, tokenIdentifier).TokenSetKeyRequest(api.TokenSetKeyRequest{
 		Key: key,
 	}).Execute()
+
+	//return apiClient.CoreApi.CoreTokensSetKeyCreateExecute(apiClient.CoreApi.CoreTokensSetKeyCreate(ctx, tokenIdentifier).TokenSetKeyRequest(api.TokenSetKeyRequest{
+	//	Key: key,
+	//}))
 }
 
 func RetrieveUserToken(ctx context.Context, apiClient *api.APIClient, tokenIdentifier string) (*api.TokenView, *http.Response, error) {
