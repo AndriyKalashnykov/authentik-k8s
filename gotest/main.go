@@ -59,7 +59,7 @@ func main() {
 		log.Panicf("error: %v", err)
 	}
 	if token != nil {
-		log.Printf("Token: %v", token.Pk)
+		log.Printf("Token: %v", token)
 	}
 
 	// retrieve qleetctl user's OAuth token
@@ -68,8 +68,10 @@ func main() {
 		log.Panicf("error: %v", err)
 	}
 	if tv != nil {
-		log.Printf("Oauth token: %v", tv.Key)
+		log.Printf("OAuth token: %v", tv.Key)
 	}
+
+	//userToken = "ZId4CDEtmHbnuxkJH2ehUzHgYeTmOansuCO0JsTTsZnYB1z9N0WoAutpyH4i"
 
 	// create authentic API client using qleetctl Oauth token (tv.Key) from previous step
 	qleetctlConfig := authentik.CreateConfiguration(AuthentikServerScheme, AuthentikServerHost, tv.Key)
