@@ -4,6 +4,19 @@ kind: Namespace
 metadata:
   name: threeport-api
 ---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: authentik-bootstrap
+  labels:
+    app.kubernetes.io/name: authentik
+    app.kubernetes.io/instance: authentik
+  namespace: "threeport-api"
+type: Opaque
+data:
+  authentik-bootstrap-password: "QXV0aGVudGlrMDEyMzQ1Njc4OTAh"
+  authentik-bootstrap-token: "Tm9NbHhCUXVZZ2Z1M2oxOXlnR3FoalhlbkFqckpnT2ZONW5hcW1TREJVaGRMallxSEt6ZTd5eXpZMDdI"
+---
 # Source: authentik/charts/redis/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
@@ -480,9 +493,15 @@ spec:
             - name: AUTHENTIK_SECRET_KEY
               value: "PleaseGenerateA50CharKey"
             - name: AUTHENTIK_BOOTSTRAP_PASSWORD
-              value: "Authentik01234567890!"
+              valueFrom:
+                secretKeyRef:
+                  name: authentik-bootstrap
+                  key: authentik-bootstrap-password
             - name: AUTHENTIK_BOOTSTRAP_TOKEN
-              value: "NoMlxBQuYgfu3j19ygGqhjXenAjrJgOfN5naqmSDBUhdLjYqHKze7yyzY07H"
+              valueFrom:
+                secretKeyRef:
+                  name: authentik-bootstrap
+                  key: authentik-bootstrap-token
           volumeMounts:
       
           ports:
@@ -585,9 +604,15 @@ spec:
             - name: AUTHENTIK_SECRET_KEY
               value: "PleaseGenerateA50CharKey"
             - name: AUTHENTIK_BOOTSTRAP_PASSWORD
-              value: "Authentik01234567890!"
+              valueFrom:
+                secretKeyRef:
+                  name: authentik-bootstrap
+                  key: authentik-bootstrap-password
             - name: AUTHENTIK_BOOTSTRAP_TOKEN
-              value: "NoMlxBQuYgfu3j19ygGqhjXenAjrJgOfN5naqmSDBUhdLjYqHKze7yyzY07H"
+              valueFrom:
+                secretKeyRef:
+                  name: authentik-bootstrap
+                  key: authentik-bootstrap-token
           volumeMounts:
       
       volumes:
