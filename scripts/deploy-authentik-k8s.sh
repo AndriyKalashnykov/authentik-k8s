@@ -16,7 +16,7 @@ kubectl wait deployment -n threeport-api authentik-worker --for condition=Availa
 echo "waiting for authentik-server to get ready"
 kubectl wait deployment -n threeport-api authentik-server --for condition=Available=True --timeout=180s
 
-LB_IP=$(kubectl get svc/authentik -o=jsonpath='{.status.loadBalancer.ingress[0].ip}')
+LB_IP=$(kubectl get svc/authentik -n threeport-api -o=jsonpath='{.status.loadBalancer.ingress[0].ip}')
 
 echo "login: akadmin, pwd: Authentik01234567890!"
 
