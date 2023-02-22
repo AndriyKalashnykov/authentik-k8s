@@ -15,4 +15,6 @@ docker-compose up
 
 xdg-open https://localhost:9443/
 
+docker-compose down --volumes
+
 cd $LAUNCH_DIR

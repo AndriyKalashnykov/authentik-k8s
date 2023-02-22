@@ -19,6 +19,8 @@ services:
       - POSTGRES_DB=${PG_DB:-authentik}
     env_file:
       - .env
+    ports:
+      - "0.0.0.0:${PG_PORT_HTTP:-5432}:5432"
   redis:
     image: docker.io/library/redis:alpine
     command: --save 60 1 --loglevel warning
