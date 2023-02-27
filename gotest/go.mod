@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/go-openapi/runtime v0.25.0
-	goauthentik.io/api/v3 v3.2023022.4
+	goauthentik.io/api/v3 v3.2023022.6
 )
 
 require (
