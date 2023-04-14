@@ -10,10 +10,10 @@
 
 ## Requirements
 
-- [gvm](https://github.com/moovweb/gvm) Go 1.19
+- [gvm](https://github.com/moovweb/gvm) Go 1.20.3
     ```bash
-    gvm install go1.19 --prefer-binary --with-build-tools --with-protobuf
-    gvm use go1.19 --default
+    gvm install go1.20.3 --prefer-binary --with-build-tools --with-protobuf
+    gvm use go1.20.3 --default
     ```
 - [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation)
 - [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
@@ -183,10 +183,16 @@ make run
 
 ## Login to Authentik Web Admin inteface
 
+Docker Compose
+```bash
+echo "login: akadmin, pwd: Authentik01234567890!"
+xdg-open https://localhost:9443/if/admin/#/administration/overview
+```
+
+Kubernetes
 ```bash
 LB_IP=$(kubectl get svc/authentik -o=jsonpath='{.status.loadBalancer.ingress[0].ip}')
 echo "login: akadmin, pwd: Authentik01234567890!"
-cd $LAUNCH_DIR
 xdg-open https://$LB_IP:443/if/admin/#/administration/overview
 ```
 
