@@ -10,10 +10,10 @@
 
 ## Requirements
 
-- [gvm](https://github.com/moovweb/gvm) Go 1.20.3
+- [gvm](https://github.com/moovweb/gvm) Go 1.21.1
     ```bash
-    gvm install go1.20.3 --prefer-binary --with-build-tools --with-protobuf
-    gvm use go1.20.3 --default
+    gvm install go1.21.1 --prefer-binary --with-build-tools --with-protobuf
+    gvm use go1.21.1 --default
     ```
 - [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation)
 - [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)

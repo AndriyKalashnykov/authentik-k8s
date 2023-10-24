@@ -356,7 +356,7 @@ metadata:
     helm.sh/chart: authentik-2022.12.4
     app.kubernetes.io/name: authentik
     app.kubernetes.io/instance: authentik
-    app.kubernetes.io/version: "2023.4.1"
+    app.kubernetes.io/version: "2023.8.3"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: "server"
 spec:
@@ -372,7 +372,7 @@ spec:
         app.kubernetes.io/name: authentik
         app.kubernetes.io/instance: authentik
         app.kubernetes.io/component: "server"
-        app.kubernetes.io/version: "2023.4.1"
+        app.kubernetes.io/version: "2023.8.3"
     spec:
       serviceAccountName: authentik
       enableServiceLinks: true
@@ -392,7 +392,7 @@ spec:
               mountPath: "/etc/threeport/db-create"
       containers:
         - name: authentik
-          image: "ghcr.io/goauthentik/server:2023.4.1"
+          image: "ghcr.io/goauthentik/server:2023.8.3"
           imagePullPolicy: "IfNotPresent"
           args: ["server"]
           env:            
@@ -475,7 +475,7 @@ metadata:
     helm.sh/chart: authentik-2022.12.4
     app.kubernetes.io/name: authentik
     app.kubernetes.io/instance: authentik
-    app.kubernetes.io/version: "2023.4.1"
+    app.kubernetes.io/version: "2023.8.3"
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/component: "worker"
 spec:
@@ -491,7 +491,7 @@ spec:
         app.kubernetes.io/name: authentik
         app.kubernetes.io/instance: authentik
         app.kubernetes.io/component: "worker"
-        app.kubernetes.io/version: "2023.4.1"
+        app.kubernetes.io/version: "2023.8.3"
     spec:
       serviceAccountName: authentik
       enableServiceLinks: true
@@ -511,7 +511,7 @@ spec:
                mountPath: "/etc/threeport/db-create"
       containers:
         - name: authentik
-          image: "ghcr.io/goauthentik/server:2023.4.1"
+          image: "ghcr.io/goauthentik/server:2023.8.3"
           imagePullPolicy: "IfNotPresent"
           args: ["worker"]
           env:            
@@ -725,7 +725,7 @@ metadata:
     helm.sh/chart: authentik-2022.12.4
     app.kubernetes.io/name: authentik
     app.kubernetes.io/instance: authentik
-    app.kubernetes.io/version: "2023.4.1"
+    app.kubernetes.io/version: "2023.8.3"
     app.kubernetes.io/managed-by: Helm
 spec:
   rules:
