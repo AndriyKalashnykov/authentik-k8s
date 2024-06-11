@@ -1,6 +1,6 @@
 module github.com/AndriyKalashnykov/authentik-k8s/gotest
 
-go 1.21
+go 1.22
 
 require (
 	github.com/go-openapi/runtime v0.26.0
