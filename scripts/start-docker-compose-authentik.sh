@@ -4,7 +4,7 @@ LAUNCH_DIR=$(pwd); SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; c
 
 cd $SCRIPT_PARENT_DIR/compose
 
-docker-compose down --volumes
+docker compose down --volumes
 rm -rf certs/
 rm -rf custom-templates/
 rm -rf media/
@@ -14,6 +14,6 @@ docker-compose up
 
 # xdg-open https://localhost:9443/
 
-docker-compose down --volumes
+docker compose down --volumes
 
 cd $LAUNCH_DIR

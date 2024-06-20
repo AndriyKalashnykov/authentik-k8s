@@ -12,10 +12,10 @@
 
 ## Requirements
 
-- [gvm](https://github.com/moovweb/gvm) Go 1.21.1
+- [gvm](https://github.com/moovweb/gvm) Go 1.22.4
     ```bash
-    gvm install go1.21.1 --prefer-binary --with-build-tools --with-protobuf
-    gvm use go1.21.1 --default
+    gvm install go1.22.4 --prefer-binary --with-build-tools --with-protobuf
+    gvm use go1.22.4 --default
     ```
 - [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation)
 - [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
@@ -49,7 +49,7 @@ helm template authentik authentik/authentik -f ./k8s/postgresql/values.yml > ./k
 
 If you want to set predefined `password` and `token` for the default admin user `akadmin`:
 
-edit `deploy.yml` ->  Deployment `authentik-server`
+edit `./k8s/postgresql/authentik-postgresql.yml` ->  Deployment `authentik-server`
 
 ```yaml
 apiVersion: apps/v1
@@ -73,7 +73,7 @@ spec:
               value: "NoMlxBQuYgfu3j19ygGqhjXenAjrJgOfN5naqmSDBUhdLjYqHKze7yyzY07H"
 ```
 
-edit `deploy.yml` ->  Deployment `authentik-worker`
+edit `./k8s/postgresql/authentik-postgresql.yml` ->  Deployment `authentik-worker`
 
 ```yaml
 apiVersion: apps/v1
