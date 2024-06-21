@@ -218,3 +218,7 @@ Groups-User
 
 Tokens
 ![](./docs/img/tokens.jpg "Tokens")
+
+### Referenced
+
+[Authentik and Traefik](https://github.com/brokenscripts/authentik_traefik)
