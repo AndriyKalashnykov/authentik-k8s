@@ -1,4 +1,4 @@
-[![Hits](https://hits.sh/github.com/AndriyKalashnykov/authentik-k8s.svg)](https://hits.sh/github.com/AndriyKalashnykov/authentik-k8s/)
+[![Hits](https://hits.sh/github.com/AndriyKalashnykov/authentik-k8s.svg?view=today-total&style=plastic)](https://hits.sh/github.com/AndriyKalashnykov/authentik-k8s/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-brightgreen.svg)](https://opensource.org/licenses/MIT)
 # POC for [Authentik](https://goauthentik.io/) [Go client library](https://github.com/goauthentik/client-go)
 
