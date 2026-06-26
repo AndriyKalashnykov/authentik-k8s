@@ -791,7 +791,7 @@ spec:
           # PGDATA=/var/lib/postgresql/data/pgdata below keeps the 18 image
           # happy with the existing mount (no volume-path change needed here,
           # unlike the compose stack which has no explicit PGDATA).
-          image: postgres:18-alpine
+          image: postgres:18-alpine@sha256:1b1689b20d16a014a3d195653381cf2caa75a41a92d93b255a9d6ea29fd353aa
           imagePullPolicy: IfNotPresent
           env:
             - name: POSTGRES_USER
@@ -854,7 +854,7 @@ spec:
     spec:
       containers:
         - name: redis
-          image: valkey/valkey:8-alpine
+          image: valkey/valkey:8-alpine@sha256:77643d152547b446fc15cbafaff22004545663fcd40c6b28038ad283837baa75
           imagePullPolicy: IfNotPresent
           args: ["--save", "60", "1", "--loglevel", "warning"]
           ports:
