@@ -854,7 +854,7 @@ spec:
     spec:
       containers:
         - name: redis
-          image: valkey/valkey:8-alpine@sha256:77643d152547b446fc15cbafaff22004545663fcd40c6b28038ad283837baa75
+          image: valkey/valkey:9-alpine@sha256:a35428eba9043cc0b79dbe54100f0c92784f2de00ad09b01182bfb1c5c83d1bd
           imagePullPolicy: IfNotPresent
           args: ["--save", "60", "1", "--loglevel", "warning"]
           ports:
