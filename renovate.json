@@ -68,8 +68,8 @@
       "groupName": "GitHub Actions"
     },
     {
-      "description": "Do not track the experimental, known-broken CockroachDB backend. CockroachDB lacks pg_advisory_lock() which Authentik's Django migrations require, so these manifests are intentionally frozen (and their stale Authentik 2024.4 image pins would otherwise collide with the live 2026.5 pins in the Authentik server group, causing Renovate's dedup to drop one side).",
-      "matchFileNames": ["k8s/cockroachdb/**"],
+      "description": "Do not track the experimental, known-non-working CockroachDB and YugabyteDB backends. CockroachDB lacks pg_advisory_lock(); YugabyteDB has it but Authentik's Django migrations still abort on YB001 transaction conflicts (see docs/spikes/authentik-cockroachdb-yugabytedb.md). These manifests are intentionally frozen — and freezing also avoids their authentik-server/valkey image pins colliding with the live k8s/postgresql pins in the Authentik server group (Renovate dedup would drop one side).",
+      "matchFileNames": ["k8s/cockroachdb/**", "k8s/yugabytedb/**"],
       "enabled": false
     },
     {
