@@ -787,7 +787,11 @@ spec:
     spec:
       containers:
         - name: postgresql
-          image: postgres:16-alpine
+          # postgres:18+ relocated its default data dir, but the explicit
+          # PGDATA=/var/lib/postgresql/data/pgdata below keeps the 18 image
+          # happy with the existing mount (no volume-path change needed here,
+          # unlike the compose stack which has no explicit PGDATA).
+          image: postgres:18-alpine
           imagePullPolicy: IfNotPresent
           env:
             - name: POSTGRES_USER
