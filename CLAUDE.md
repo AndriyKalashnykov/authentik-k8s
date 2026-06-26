@@ -107,3 +107,11 @@ cp compose/.env.example  compose/.env    # Compose stack: PG_*, AUTHENTIK_SECRET
 - **Test layers**:
   - *Unit + hermetic httptest contracts* (`make test`, no infra): `internal/authentik` (100%) — `CreateConfiguration` auth-header contract + httptest contracts for every `CoreApi` wrapper at the real `/api/v3/...` paths; `internal/util` (87.5%); `main` (66%) — `CreateGroupsAndUsers` whole-flow vs a mock Authentik (`main_test.go`). `CreateGroupsAndUsers` returns `error` (not `log.Panicf`) so the flow is testable.
   - *Live e2e* (`e2e_test.go`, build tag `e2e`) — drives the full flow against a real Authentik and verifies persistence with the admin + the created user's token. Two ways to run it: `make e2e-compose` (Authentik via Docker Compose — lightweight) or `make e2e` (KinD + cloud-provider-kind — full cluster). Both read `AUTHENTIK_E2E_*` env and self-tear-down. Excluded from `make test`.
+
+## Upgrade Backlog
+
+Deferred / monitor items from `/upgrade-analysis` (2026-06-26). The repo is otherwise fully current — Go 1.26.4, all mise tools at latest, Authentik 2026.5, postgres 18 / valkey 9, kubectl 1.36.2 / kind 0.32 / node v1.36.1 (aligned), cloud-provider-kind 0.11.1, all Action SHAs at current major tags; `govulncheck` clean; Renovate alive (automerge on, no Errored branches).
+
+- [ ] **CockroachDB backend** (`k8s/cockroachdb/`, frozen) — revisit only when [cockroachdb#169981](https://github.com/cockroachdb/cockroach/issues/169981) (session-scoped `pg_advisory_lock()`) closes in a future 26.x. Until then it stays frozen + Renovate-ignored.
+- [ ] **YugabyteDB backend** (`k8s/yugabytedb/`, frozen experimental) — advisory locks work, but Authentik 2026.5 migrations abort on YB001 transaction conflicts (see `docs/spikes/authentik-cockroachdb-yugabytedb.md`). Revisit when a newer YugabyteDB improves DDL-transaction handling, or Authentik tolerates YugabyteDB's transaction model.
+- [ ] **Renovate `lock-file-maintenance`** is in "Awaiting Schedule" (working as designed — periodic `go.sum` refresh); no action needed.
