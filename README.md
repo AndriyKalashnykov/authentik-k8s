@@ -32,7 +32,7 @@ flowchart LR
     POC -->|"HTTPS REST API + admin bootstrap token"| SERVER
 
     COMPOSE["Option A: Docker Compose (compose/)<br/>target https://127.0.0.1:9443"]
-    KIND["Option B: KinD + cloud-provider-kind (k8s/)<br/>LoadBalancer IP, target https://LB-IP:443<br/>postgres:16-alpine, valkey:8-alpine"]
+    KIND["Option B: KinD + cloud-provider-kind (k8s/)<br/>LoadBalancer IP, target https://LB-IP:443<br/>postgres:18-alpine, valkey:8-alpine"]
 
     COMPOSE -.deploys.-> AUTHENTIK
     KIND -.deploys.-> AUTHENTIK
