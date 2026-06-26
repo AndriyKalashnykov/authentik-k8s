@@ -94,19 +94,33 @@ cp compose/.env.example  compose/.env    # Compose stack: PG_*, AUTHENTIK_SECRET
 
 - **POC flow** (`CreateGroupsAndUsers`, called 4× for org-01/org-02 × admin/user): create group → create user in group → set password → create API token → retrieve the Authentik-generated key → overwrite it with a known key → re-create an API client *as that user* with the known token → call `MeRetrieveUser` to read the user's groups. The final step demonstrates a non-privileged token can read its own group membership.
 
-- **Manifests are committed artifacts generated from `values.yml`** — but with **two intentional hand-edits**: (1) the `AUTHENTIK_BOOTSTRAP_PASSWORD`/`AUTHENTIK_BOOTSTRAP_TOKEN` env on server+worker; (2) the PostgreSQL and Redis workloads were swapped from the chart's **Bitnami subchart images (removed from Docker Hub in 2025)** to **OSS Deployments** — `postgres:18-alpine` and `valkey/valkey:8-alpine` (Valkey = the BSD/Linux-Foundation Redis fork). The postgres Deployment sets `PGDATA=/var/lib/postgresql/data/pgdata` (an explicit subdir), which keeps the postgres:18+ image — whose default data dir relocated to `/var/lib/postgresql` — working with the existing `/var/lib/postgresql/data` mount (the compose stack, which has no explicit `PGDATA`, instead mounts the volume at `/var/lib/postgresql`). They keep the original Service selectors/ports and read DB creds from the `authentik` Secret, so `authentik-server` connects unchanged. **Regenerating from the chart reintroduces Bitnami** — re-apply the OSS swap after any `helm template` (or disable the chart's bundled `postgresql`/`redis` and point Authentik at the OSS workloads). A few now-unused Bitnami `ConfigMap`s (redis-scripts/health/config, pg-extended-config) remain as harmless dead config.
+- **Manifests are committed artifacts generated from `values.yml`** — but with **two intentional hand-edits**: (1) the `AUTHENTIK_BOOTSTRAP_PASSWORD`/`AUTHENTIK_BOOTSTRAP_TOKEN` env on server+worker; (2) the PostgreSQL and Redis workloads were swapped from the chart's **Bitnami subchart images (removed from Docker Hub in 2025)** to **OSS Deployments** — `postgres:18-alpine` and `valkey/valkey:9-alpine` (Valkey = the BSD/Linux-Foundation Redis fork). The postgres Deployment sets `PGDATA=/var/lib/postgresql/data/pgdata` (an explicit subdir), which keeps the postgres:18+ image — whose default data dir relocated to `/var/lib/postgresql` — working with the existing `/var/lib/postgresql/data` mount (the compose stack, which has no explicit `PGDATA`, instead mounts the volume at `/var/lib/postgresql`). They keep the original Service selectors/ports and read DB creds from the `authentik` Secret, so `authentik-server` connects unchanged. **Regenerating from the chart reintroduces Bitnami** — re-apply the OSS swap after any `helm template` (or disable the chart's bundled `postgresql`/`redis` and point Authentik at the OSS workloads). A few now-unused Bitnami `ConfigMap`s (redis-scripts/health/config, pg-extended-config) remain as harmless dead config.
 
-- **Namespace mismatch between manifests and the deploy script (real bug).** Every resource in `k8s/postgresql/authentik-postgresql.yml` is pinned to `namespace: "default"`, so `kubectl apply -f` lands them in `default`. But `deploy-authentik-k8s.sh` then runs its `patch`/`wait` against `-n threeport-api` (empty). When touching the k8s deploy path, reconcile these two — don't propagate `threeport-api`.
+- **Namespace is `default` end-to-end.** Every resource in `k8s/postgresql/authentik-postgresql.yml` is pinned to `namespace: "default"`, and the `provisioner/` Makefile deploy path (`kind-deploy`) uses `AUTHENTIK_NS := default` — they match. (A former standalone `deploy-authentik-k8s.sh` that patched/waited against `-n threeport-api` was removed; the Makefile is the only deploy path now.)
 
 ## Conventions
 
 - Config is externalized to env vars with fallback defaults (no hardcoded hosts/ports/secrets); see the Environment configuration section. Renovate tracks every pinned version (`renovate.json`); validate with `make renovate-validate`.
 - The client library takes pointers for optional request fields; use the `util.*ToPointer` helpers rather than inlining `&`.
-- **CI**: `.github/workflows/ci.yml` runs `make static-check` + `make build` + `make test` via `jdx/mise-action` (toolchain from `provisioner/.mise.toml`). The Go project is in `provisioner/`, so jobs set `working-directory: provisioner`. A `dorny/paths-filter` `changes` job gates the heavy jobs on `provisioner/**`/`.github/workflows/**`/`CLAUDE.md` edits — doc/k8s/compose/scripts changes skip CI; a `ci-pass` job aggregates results. No tags/publish/e2e (the POC needs a live Authentik instance). No secrets required.
+- **CI**: `.github/workflows/ci.yml` runs `make static-check` + `make build` + `make test` via `jdx/mise-action` (toolchain from `provisioner/.mise.toml`). The Go project is in `provisioner/`, so jobs set `working-directory: provisioner`. A `dorny/paths-filter` `changes` job gates the heavy jobs on `provisioner/**`/`.github/workflows/**`/`CLAUDE.md` edits — doc/k8s/compose changes skip CI; a `ci-pass` job aggregates results. No tags/publish/e2e (the POC needs a live Authentik instance). No secrets required.
 - The local quality gate (`provisioner/Makefile` → `make ci`: golangci-lint + govulncheck + go-mod-tidy + toolchain-alignment) mirrors CI. `.golangci.yml` runs the standard linters; gosec is intentionally omitted (the POC hardcodes test tokens and skips TLS verify by design — documented in `.golangci.yml`).
 - **Test layers**:
   - *Unit + hermetic httptest contracts* (`make test`, no infra): `internal/authentik` (100%) — `CreateConfiguration` auth-header contract + httptest contracts for every `CoreApi` wrapper at the real `/api/v3/...` paths; `internal/util` (87.5%); `main` (66%) — `CreateGroupsAndUsers` whole-flow vs a mock Authentik (`main_test.go`). `CreateGroupsAndUsers` returns `error` (not `log.Panicf`) so the flow is testable.
   - *Live e2e* (`e2e_test.go`, build tag `e2e`) — drives the full flow against a real Authentik and verifies persistence with the admin + the created user's token. Two ways to run it: `make e2e-compose` (Authentik via Docker Compose — lightweight) or `make e2e` (KinD + cloud-provider-kind — full cluster). Both read `AUTHENTIK_E2E_*` env and self-tear-down. Excluded from `make test`.
+
+## Skills
+
+Infrastructure files in this repo map to these maintenance skills — run the matching skill when editing the file:
+
+| File | Skill |
+|------|-------|
+| `provisioner/Makefile` | `/makefile` |
+| `.github/workflows/ci.yml` | `/ci-workflow` |
+| `renovate.json` | `/renovate` |
+| `README.md` | `/readme` |
+| `CLAUDE.md` | `/claude` |
+
+When spawning subagents to work on any of the above, always pass the relevant skill's full conventions into the agent prompt — agents cannot read skill files themselves.
 
 ## Upgrade Backlog
 

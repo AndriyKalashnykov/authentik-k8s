@@ -29,15 +29,3 @@ func BoolToPointer(in bool) *bool {
 func StringToPointer(in string) *string {
 	return &in
 }
-
-//// get user's Groups (requires special permissions like Superuser etc.)
-//pl, resp, err := authentik.ListUser(ctx, qleetctlApiClient, QleetctlUser)
-//if err != nil {
-//log.Panicf("error: %v", err)
-//}
-//if resp != nil {
-//users := pl.GetResults()
-//if pl != nil && len(pl.Results) > 0 {
-//log.Printf("User Groups: %v", users[0].Groups)
-//}
-//}
