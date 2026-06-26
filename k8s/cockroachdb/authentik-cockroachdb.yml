@@ -381,7 +381,7 @@ spec:
         {}
       initContainers:
         - name: db-init
-          image: cockroachdb/cockroach:v22.2.2
+          image: cockroachdb/cockroach:v22.2.19
           imagePullPolicy: "IfNotPresent"
           command:
             - "bash"
@@ -500,7 +500,7 @@ spec:
         {}
       initContainers:
          - name: db-init
-           image: cockroachdb/cockroach:v22.2.2
+           image: cockroachdb/cockroach:v22.2.19
            imagePullPolicy: "IfNotPresent"
            command:
              - "bash"
