@@ -90,6 +90,27 @@ func TestCreateGroupsAndUsers_WholePath(t *testing.T) {
 	}
 }
 
+// TestDeriveNames locks the demo naming convention: group/user/token/path are
+// derived from (org, role, group) via the single-sourced naming constants.
+func TestDeriveNames(t *testing.T) {
+	cases := []struct {
+		org, role, group                             string
+		wantGroup, wantUser, wantToken, wantUserPath string
+	}{
+		{"org-01", roleAdmin, groupAdmins, "org-01-admins", "org-01-admin", "org-01-admin-token", "orgs/org-01"},
+		{"org-01", roleUser, groupUsers, "org-01-users", "org-01-user", "org-01-user-token", "orgs/org-01"},
+		{"org-02", roleAdmin, groupAdmins, "org-02-admins", "org-02-admin", "org-02-admin-token", "orgs/org-02"},
+	}
+	for _, c := range cases {
+		g, u, tok, p := deriveNames(c.org, c.role, c.group)
+		if g != c.wantGroup || u != c.wantUser || tok != c.wantToken || p != c.wantUserPath {
+			t.Errorf("deriveNames(%q,%q,%q) = (%q,%q,%q,%q), want (%q,%q,%q,%q)",
+				c.org, c.role, c.group, g, u, tok, p,
+				c.wantGroup, c.wantUser, c.wantToken, c.wantUserPath)
+		}
+	}
+}
+
 func writeJSON(w http.ResponseWriter, status int, body string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)

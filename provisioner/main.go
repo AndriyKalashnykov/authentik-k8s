@@ -27,6 +27,31 @@ const (
 	defaultOrg2UserToken  = "svkH90FMYlnXPA5JHxePVQkozTjXReT6rsdQ2BXedwI5mtrFYR5mfrunMt4B"
 )
 
+// Demo naming convention. Group / user / token-identifier names are derived
+// from the org name (see deriveNames + .env.example); these are the fixed
+// role/group segments and join tokens, single-sourced so the scheme lives in
+// exactly one place rather than as inline literals in the provisioning table.
+const (
+	roleAdmin      = "admin"  // user-name segment for the admin user
+	roleUser       = "user"   // user-name segment for the regular user
+	groupAdmins    = "admins" // group-name segment for admins (superusers)
+	groupUsers     = "users"  // group-name segment for regular users
+	nameSep        = "-"      // joins <org> with <role>/<group>
+	tokenSuffix    = "-token" // appended to the user name to form the token identifier
+	userPathPrefix = "orgs/"  // Authentik user `path` prefix, namespaced per org
+)
+
+// deriveNames builds the Authentik object names for one (org, role, group) from
+// the demo naming convention. Pure + exported-to-the-test so the scheme is
+// locked by a unit test rather than only exercised live.
+func deriveNames(org, role, group string) (groupName, userName, tokenIdentifier, userPath string) {
+	groupName = org + nameSep + group
+	userName = org + nameSep + role
+	tokenIdentifier = userName + tokenSuffix
+	userPath = userPathPrefix + org
+	return groupName, userName, tokenIdentifier, userPath
+}
+
 // env returns the value of key, or fallback when unset/empty.
 func env(key, fallback string) string {
 	if v, ok := os.LookupEnv(key); ok && v != "" {
@@ -139,23 +164,20 @@ func main() {
 	// the per-user OAuth token keys are externalized to env.
 	type provision struct {
 		org       string
-		role      string // "admin" | "user"
-		group     string // "admins" | "users"
+		role      string // roleAdmin | roleUser
+		group     string // groupAdmins | groupUsers
 		superuser bool   // admins can log into the Authentik admin UI
 		token     string
 	}
 	requests := []provision{
-		{org1, "admin", "admins", true, env("AUTHENTIK_ORG1_ADMIN_TOKEN", defaultOrg1AdminToken)},
-		{org1, "user", "users", false, env("AUTHENTIK_ORG1_USER_TOKEN", defaultOrg1UserToken)},
-		{org2, "admin", "admins", true, env("AUTHENTIK_ORG2_ADMIN_TOKEN", defaultOrg2AdminToken)},
-		{org2, "user", "users", false, env("AUTHENTIK_ORG2_USER_TOKEN", defaultOrg2UserToken)},
+		{org1, roleAdmin, groupAdmins, true, env("AUTHENTIK_ORG1_ADMIN_TOKEN", defaultOrg1AdminToken)},
+		{org1, roleUser, groupUsers, false, env("AUTHENTIK_ORG1_USER_TOKEN", defaultOrg1UserToken)},
+		{org2, roleAdmin, groupAdmins, true, env("AUTHENTIK_ORG2_ADMIN_TOKEN", defaultOrg2AdminToken)},
+		{org2, roleUser, groupUsers, false, env("AUTHENTIK_ORG2_USER_TOKEN", defaultOrg2UserToken)},
 	}
 
 	for _, r := range requests {
-		groupName := r.org + "-" + r.group
-		userName := r.org + "-" + r.role
-		tokenIdentifier := userName + "-token"
-		userPath := "orgs/" + r.org
+		groupName, userName, tokenIdentifier, userPath := deriveNames(r.org, r.role, r.group)
 		if err := CreateGroupsAndUsers(ctx, scheme, host, bootstrapToken,
 			groupName, r.superuser, userName, userPath, password, tokenIdentifier, r.token); err != nil {
 			log.Fatalf("error: %v", err)
