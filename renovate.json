@@ -1,14 +1,34 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
+  "extends": [
+    "config:best-practices",
+    ":semanticCommitType(chore)"
+  ],
   "timezone": "UTC",
+  "enabledManagers": [
+    "gomod",
+    "github-actions",
+    "dockerfile",
+    "docker-compose",
+    "kubernetes",
+    "mise",
+    "custom.regex"
+  ],
+  "commitMessagePrefix": "chore(all): ",
+  "commitMessageAction": "update",
+  "commitBody": "Signed-off-by: Renovate Bot <bot@renovateapp.com>",
+  "labels": ["dependencies"],
+  "prConcurrentLimit": 50,
+  "prHourlyLimit": 0,
+  "automerge": false,
+  "postUpdateOptions": ["gomodTidy"],
   "kubernetes": {
     "managerFilePatterns": ["/k8s/.+\\.ya?ml$/"]
   },
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Makefile tool-version constants (e.g. CLOUD_PROVIDER_KIND_VERSION) pinned via # renovate: comments. currentValue must start with a digit so image refs are handled by the dedicated manager below.",
+      "description": "Makefile tool-version constants pinned via # renovate: comments. currentValue must start with a digit so image refs are handled by the dedicated manager below.",
       "managerFilePatterns": ["/(^|/)Makefile$/"],
       "matchStrings": [
         "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)(?: versioning=(?<versioning>\\S+))?(?: extractVersion=(?<extractVersion>\\S+))?\\s+[A-Z0-9_]+\\s*:?=\\s*(?<currentValue>[0-9][^\\s@]*)"
@@ -32,22 +52,78 @@
       ]
     }
   ],
+  "vulnerabilityAlerts": {
+    "labels": ["security"],
+    "minimumReleaseAge": "0 days"
+  },
   "packageRules": [
     {
+      "description": "Wait 3 days before opening major-update PRs (stability buffer).",
+      "matchUpdateTypes": ["major"],
+      "minimumReleaseAge": "3 days"
+    },
+    {
+      "description": "Group GitHub Actions into one PR.",
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub Actions"
+    },
+    {
+      "description": "Do not track the experimental, known-broken CockroachDB backend. CockroachDB lacks pg_advisory_lock() which Authentik's Django migrations require, so these manifests are intentionally frozen (and their stale Authentik 2024.4 image pins would otherwise collide with the live 2026.5 pins in the Authentik server group, causing Renovate's dedup to drop one side).",
+      "matchFileNames": ["k8s/cockroachdb/**"],
+      "enabled": false
+    },
+    {
       "description": "Group the Go toolchain across go.mod, .mise.toml and the Dockerfile so they bump as a unit (paired with `make check-toolchain-alignment`).",
-      "groupName": "go toolchain",
       "matchManagers": ["gomod", "mise", "dockerfile"],
-      "matchPackageNames": ["go", "golang"]
+      "matchPackageNames": ["go", "golang"],
+      "groupName": "go toolchain"
+    },
+    {
+      "description": "Bump the go directive in go.mod to the latest patch rather than widening the range.",
+      "matchManagers": ["gomod"],
+      "matchDepNames": ["go"],
+      "rangeStrategy": "bump"
     },
     {
       "description": "Group the local Kubernetes toolchain (kind / kubectl / node image / cloud-provider-kind).",
-      "groupName": "kubernetes toolchain",
       "matchPackageNames": [
         "kubernetes-sigs/kind",
         "kubernetes/kubectl",
-        "kubernetes-sigs/cloud-provider-kind",
+        "registry.k8s.io/cloud-provider-kind/cloud-controller-manager",
         "kindest/node"
-      ]
+      ],
+      "groupName": "kubernetes toolchain"
+    },
+    {
+      "description": "Hold mise aqua/github-tags tools 3 days so the upstream GitHub Release artifacts the aqua backend installs are published before the PR opens (avoids the tag-before-publish 404).",
+      "matchManagers": ["mise"],
+      "matchDatasources": ["github-tags"],
+      "minimumReleaseAge": "3 days"
+    },
+    {
+      "description": "Lock kubectl to the cluster node's minor line (kindest/node v1.36.x). CI runs no live e2e, so it cannot catch kubectl<->apiserver skew — this constraint is the only guard. Matches by packageName (the mise aqua depName is `aqua:kubernetes/kubectl`, but packageName resolves to `kubernetes/kubectl`). Bump it together with kind + kindest/node when the cluster moves to a new minor.",
+      "matchManagers": ["mise"],
+      "matchPackageNames": ["kubernetes/kubectl"],
+      "allowedVersions": "/^1\\.36\\./"
+    },
+    {
+      "description": "Custom.regex docker pins (env-file AUTHENTIK_TAG, Makefile cloud-provider-kind) are bare tags/versions, not pullable image refs, so docker:pinDigests cannot render a write for them — disable it. Production-runtime pins via the built-in dockerfile/docker-compose/kubernetes managers keep their digests.",
+      "matchManagers": ["custom.regex"],
+      "matchDatasources": ["docker"],
+      "pinDigests": false
+    },
+    {
+      "description": "KIND_NODE_IMAGE already carries a digest; suppress standalone digest-refresh updates so they don't collide with and silently drop the version bump (which brings its own fresh digest).",
+      "matchPackageNames": ["kindest/node"],
+      "matchUpdateTypes": ["digest"],
+      "enabled": false
+    },
+    {
+      "description": "Group the Authentik server image across the k8s manifest (kubernetes manager) and compose .env (custom.regex). Both pin the rolling `2026.5` tag; pinDigests:false keeps them symmetric (the env tag cannot carry a digest) so dedup doesn't drop one side.",
+      "matchManagers": ["kubernetes", "custom.regex"],
+      "matchPackageNames": ["ghcr.io/goauthentik/server"],
+      "groupName": "Authentik server",
+      "pinDigests": false
     }
   ]
 }

@@ -18,7 +18,10 @@ KUBECTL           := kubectl --context=kind-$(KIND_CLUSTER_NAME)
 MANIFEST          := ../k8s/postgresql/authentik-postgresql.yml
 KIND_CONFIG       := ../k8s/kind-config.yaml
 AUTHENTIK_NS      := default
-# renovate: datasource=github-releases depName=kubernetes-sigs/cloud-provider-kind extractVersion=^v(?<version>.*)$
+# Track the REGISTRY image (the consumed sink), not the GitHub release: registry.k8s.io
+# image promotion lags the upstream release, so github-releases proposes un-pullable tags.
+# The `# renovate:` line MUST stay immediately above the constant (customManager adjacency).
+# renovate: datasource=docker depName=registry.k8s.io/cloud-provider-kind/cloud-controller-manager extractVersion=^v(?<version>.*)$
 CLOUD_PROVIDER_KIND_VERSION := 0.11.1
 # renovate: datasource=docker depName=kindest/node
 KIND_NODE_IMAGE := kindest/node:v1.36.1@sha256:3489c7674813ba5d8b1a9977baea8a6e553784dab7b84759d1014dbd78f7ebd5
