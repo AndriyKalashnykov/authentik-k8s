@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read   # dorny/paths-filter listFiles() on pull_request events
+
+# The Go project (go.mod, Makefile, .mise.toml) lives in gotest/. Jobs that
+# run `make` set working-directory: gotest at JOB level (not workflow level —
+# ci-pass has no checkout, so a workflow-wide gotest default would break it).
+# mise-action reads gotest/.mise.toml via its own working_directory input.
+
+jobs:
+  # Cheap path detector: only Go-project or workflow changes run CI.
+  # Doc / k8s / compose / scripts changes skip the heavy jobs (positive
+  # allow-list — the code paths here are enumerable). CLAUDE.md is project
+  # config, not docs, so it counts as code.
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4
+        id: filter
+        with:
+          filters: |
+            code:
+              - 'gotest/**'
+              - '.github/workflows/**'
+              - 'CLAUDE.md'
+
+  static-check:
+    needs: [changes]
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: gotest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+        with:
+          install: true
+          cache: true
+          working_directory: gotest
+      - name: Static check
+        run: make static-check
+
+  build:
+    needs: [changes, static-check]
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: gotest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+        with:
+          install: true
+          cache: true
+          working_directory: gotest
+      - name: Build
+        run: make build
+
+  test:
+    needs: [changes, static-check]
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: gotest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+        with:
+          install: true
+          cache: true
+          working_directory: gotest
+      - name: Test
+        run: make test
+
+  ci-pass:
+    if: always()
+    needs: [changes, static-check, build, test]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Verify all jobs passed
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
+            echo "One or more jobs failed"; exit 1
+          fi
+          if [[ "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "One or more jobs were cancelled"; exit 1
+          fi
+          echo "All required jobs passed or were skipped."

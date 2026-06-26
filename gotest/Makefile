@@ -1,22 +1,233 @@
-THIS_FILE := $(lastword $(MAKEFILE_LIST))""
-GOFLAGS=-mod=mod
+.DEFAULT_GOAL := help
+
+APP_NAME := authentik-poc
+GOFLAGS  ?= -mod=mod
+
+# --- Image ---
+IMAGE_REPO ?= authentik-poc
+IMAGE_TAG  ?= dev
+IMAGE      := $(IMAGE_REPO):$(IMAGE_TAG)
+
+# --- Compose (Authentik stack — lightweight local alternative to KinD) ---
+COMPOSE_DIR := ../compose
+COMPOSE     := docker compose --project-directory $(COMPOSE_DIR) -f $(COMPOSE_DIR)/docker-compose.yml
+
+# --- KinD e2e ---
+KIND_CLUSTER_NAME ?= authentik-e2e
+KUBECTL           := kubectl --context=kind-$(KIND_CLUSTER_NAME)
+MANIFEST          := ../k8s/postgresql/authentik-postgresql.yml
+KIND_CONFIG       := ../k8s/kind-config.yaml
+AUTHENTIK_NS      := default
+# renovate: datasource=github-releases depName=kubernetes-sigs/cloud-provider-kind extractVersion=^v(?<version>.*)$
+CLOUD_PROVIDER_KIND_VERSION := 0.11.1
+# renovate: datasource=docker depName=kindest/node
+KIND_NODE_IMAGE := kindest/node:v1.36.1@sha256:3489c7674813ba5d8b1a9977baea8a6e553784dab7b84759d1014dbd78f7ebd5
+
+# Make recipes don't source shell rc files; put mise's shims dir on PATH so
+# every mise-managed tool (go, golangci-lint, govulncheck, hadolint, kind,
+# kubectl) resolves inside recipes.
+export PATH := $(HOME)/.local/share/mise/shims:$(HOME)/.local/bin:$(PATH)
+
+# Go version is mirrored in go.mod, .mise.toml and Dockerfile — read back here
+# only to verify they agree (check-toolchain-alignment). awk avoids depending
+# on a particular grep flavor.
+GO_MOD_VERSION    := $(shell awk '/^go /{print $$2; exit}' go.mod)
+MISE_GO_VERSION   := $(shell awk -F'"' '/^go[[:space:]]*=/{print $$2; exit}' .mise.toml)
+DOCKER_GO_VERSION := $(shell awk -F= '/^ARG GO_VERSION=/{print $$2; exit}' Dockerfile)
 
 #help: @ List available tasks
 help:
-	@clear
 	@echo "Usage: make COMMAND"
 	@echo "Commands :"
-	@grep -E '[a-zA-Z\.\-]+:.*?@ .*$$' $(MAKEFILE_LIST)| tr -d '#' | awk 'BEGIN {FS = ":.*?@ "}; {printf "\033[32m%-19s\033[0m - %s\n", $$1, $$2}'
+	@grep -E '[a-zA-Z\.\-]+:.*?@ .*$$' $(MAKEFILE_LIST) | tr -d '#' | awk 'BEGIN {FS = ":.*?@ "}; {printf "\033[32m%-28s\033[0m - %s\n", $$1, $$2}'
 
-#test: @ Run tests
-test:
-	@go generate
-	@export GOFLAGS=$(GOFLAGS); export TZ="UTC"; go test -v ./...
+#deps: @ Install the pinned toolchain (Go + lint/vuln/kind/kubectl tools) via mise
+deps:
+	@if [ -z "$$CI" ] && ! command -v mise >/dev/null 2>&1; then \
+		echo "Installing mise (no root required; installs to ~/.local/bin)..."; \
+		curl -fsSL https://mise.run | sh; \
+		echo ""; \
+		echo "mise installed. Activate it in your shell, then re-run 'make deps':"; \
+		echo "  echo 'eval \"\$$(~/.local/bin/mise activate bash)\"' >> ~/.bashrc"; \
+		exit 0; \
+	fi
+	@mise install --yes
 
-#run: @ Run Authentik POC
-run:
-	@export GOFLAGS=$(GOFLAGS); export TZ="UTC"; go run main.go
+#deps-check: @ Show pinned tools and their install status
+deps-check:
+	@command -v mise >/dev/null 2>&1 && mise list || echo "mise not installed — run 'make deps'"
+
+#check-toolchain-alignment: @ Verify the Go version matches across go.mod, .mise.toml and Dockerfile
+check-toolchain-alignment:
+	@if [ "$(GO_MOD_VERSION)" != "$(MISE_GO_VERSION)" ] || [ "$(GO_MOD_VERSION)" != "$(DOCKER_GO_VERSION)" ]; then \
+		echo "ERROR: Go version mismatch:"; \
+		printf "  %-12s %s\n" go.mod "$(GO_MOD_VERSION)" .mise.toml "$(MISE_GO_VERSION)" Dockerfile "$(DOCKER_GO_VERSION)"; \
+		exit 1; \
+	fi
+
+#build: @ Compile the POC binary into bin/
+build: deps
+	@export GOFLAGS=$(GOFLAGS) CGO_ENABLED=0; go build -o bin/$(APP_NAME) .
+
+#run: @ Run the POC against a running Authentik (loads .env.example then .env)
+run: deps
+	@set -a; [ -f .env.example ] && . ./.env.example; [ -f .env ] && . ./.env; set +a; \
+	 export GOFLAGS=$(GOFLAGS) TZ=UTC; go run main.go
+
+#test: @ Run unit + httptest contract tests
+test: deps
+	@export GOFLAGS=$(GOFLAGS) TZ=UTC; go test ./...
+
+#lint: @ Run golangci-lint and verify go.mod/go.sum are tidy
+lint: deps
+	@golangci-lint run ./...
+	@export GOFLAGS=$(GOFLAGS); go mod tidy && git diff --exit-code go.mod go.sum || { echo "Error: go.mod/go.sum not tidy. Run 'go mod tidy'."; exit 1; }
+
+#lint-docker: @ Lint the Dockerfile with hadolint
+lint-docker: deps
+	@hadolint Dockerfile
+
+#vulncheck: @ Scan dependencies for known vulnerabilities
+vulncheck: deps
+	@govulncheck ./...
+
+#static-check: @ Composite quality gate (alignment + lint + hadolint + vulncheck)
+static-check: deps check-toolchain-alignment lint lint-docker vulncheck
+	@echo "Static check passed."
+
+#image-build: @ Build the POC container image
+image-build: deps
+	@docker build -t $(IMAGE) -f Dockerfile .
+
+#image-run: @ Run the POC image against a running Authentik (loads .env / .env.example)
+image-run: image-build
+	@ENVFILE=$$([ -f .env ] && echo .env || echo .env.example); \
+	 docker run --rm --env-file "$$ENVFILE" $(IMAGE)
 
 #update: @ Update dependencies to latest versions
-update:
-	@export GOFLAGS=$(GOFLAGS); go get -u ./...; go mod tidy
+update: deps
+	@export GOFLAGS=$(GOFLAGS); go get -u ./... && go mod tidy
+
+#clean: @ Remove build artifacts
+clean:
+	@rm -rf bin/
+
+#renovate-validate: @ Validate renovate.json
+renovate-validate:
+	@npx --yes --package renovate renovate-config-validator ../renovate.json
+
+# ---------------------------------------------------------------------------
+# Authentik via Docker Compose (lightweight local alternative to KinD)
+# ---------------------------------------------------------------------------
+
+#compose-up: @ Start Authentik (PostgreSQL+Redis+server+worker) via Compose and wait until ready
+compose-up:
+	@[ -f $(COMPOSE_DIR)/.env ] || cp $(COMPOSE_DIR)/.env.example $(COMPOSE_DIR)/.env
+	@$(COMPOSE) up -d
+	@echo "Waiting for Authentik server readiness (https://127.0.0.1:9443/-/health/ready/)..."
+	@for i in $$(seq 1 60); do \
+		code=$$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 https://127.0.0.1:9443/-/health/ready/ 2>/dev/null || true); \
+		if [ "$$code" = "204" ] || [ "$$code" = "200" ]; then echo "Authentik ready (HTTP $$code)"; exit 0; fi; \
+		sleep 5; \
+	done; \
+	echo "ERROR: Authentik not ready within 300s"; $(COMPOSE) ps; $(COMPOSE) logs --tail=50 server; exit 1
+
+#compose-down: @ Stop the Authentik compose stack and remove volumes
+compose-down:
+	@$(COMPOSE) down -v
+
+#compose-logs: @ Follow Authentik compose logs
+compose-logs:
+	@$(COMPOSE) logs -f
+
+# ---------------------------------------------------------------------------
+# End-to-end test (build-tagged Go test against a live Authentik)
+# ---------------------------------------------------------------------------
+
+#e2e-compose: @ E2E against Authentik on Docker Compose (up -> provision+verify -> down)
+e2e-compose: deps
+	@trap '$(COMPOSE) down -v >/dev/null 2>&1 || true' EXIT INT TERM; \
+	 $(MAKE) --no-print-directory compose-up && { \
+	   set -a; . $(COMPOSE_DIR)/.env; set +a; \
+	   AUTHENTIK_E2E_SCHEME=https \
+	   AUTHENTIK_E2E_HOST=127.0.0.1:9443 \
+	   AUTHENTIK_E2E_TOKEN="$$AUTHENTIK_BOOTSTRAP_TOKEN" \
+	   AUTHENTIK_E2E_PASSWORD="$$AUTHENTIK_BOOTSTRAP_PASSWORD" \
+	   go test -tags=e2e -count=1 -v -run TestE2E ./...; \
+	 }
+
+# ---------------------------------------------------------------------------
+# KinD-based e2e (full-cluster, prod-parity alternative to Compose)
+# ---------------------------------------------------------------------------
+
+#deps-kind: @ Verify kind + kubectl are present (installed via mise)
+deps-kind: deps
+	@command -v kind >/dev/null 2>&1 || { echo "kind missing — run 'make deps'"; exit 1; }
+	@command -v kubectl >/dev/null 2>&1 || { echo "kubectl missing — run 'make deps'"; exit 1; }
+
+#kind-create: @ Create the KinD cluster + cloud-provider-kind LoadBalancer controller
+kind-create: deps-kind
+	@if kind get clusters 2>/dev/null | grep -q "^$(KIND_CLUSTER_NAME)$$"; then \
+		echo "KinD cluster '$(KIND_CLUSTER_NAME)' already exists"; \
+	else \
+		kind create cluster --name $(KIND_CLUSTER_NAME) --image $(KIND_NODE_IMAGE) --config $(KIND_CONFIG) --wait 120s; \
+	fi
+	@docker rm -f cloud-provider-kind >/dev/null 2>&1 || true
+	@docker run -d --rm --name cloud-provider-kind --network kind \
+		-v /var/run/docker.sock:/var/run/docker.sock \
+		registry.k8s.io/cloud-provider-kind/cloud-controller-manager:v$(CLOUD_PROVIDER_KIND_VERSION) >/dev/null
+
+#kind-deploy: @ Deploy Authentik to the KinD cluster and wait until ready
+kind-deploy: kind-create
+	@$(KUBECTL) apply --server-side --force-conflicts -f $(MANIFEST)
+	@echo "Waiting for PostgreSQL + Redis (OSS: postgres + valkey)..."
+	@$(KUBECTL) -n $(AUTHENTIK_NS) rollout status deployment/authentik-postgresql --timeout=180s
+	@$(KUBECTL) -n $(AUTHENTIK_NS) rollout status deployment/authentik-redis-master --timeout=180s
+	@echo "Waiting for Authentik server + worker..."
+	@$(KUBECTL) -n $(AUTHENTIK_NS) rollout status deployment/authentik-server --timeout=300s
+	@$(KUBECTL) -n $(AUTHENTIK_NS) rollout status deployment/authentik-worker --timeout=300s
+	@echo "Exposing authentik-server via LoadBalancer..."
+	@$(KUBECTL) -n $(AUTHENTIK_NS) patch svc authentik-server --type=merge -p '{"spec":{"type":"LoadBalancer"}}'
+	@for i in $$(seq 1 60); do \
+		ip=$$($(KUBECTL) -n $(AUTHENTIK_NS) get svc authentik-server -o jsonpath='{.status.loadBalancer.ingress[0].ip}' 2>/dev/null); \
+		if [ -n "$$ip" ]; then echo "LoadBalancer IP: $$ip"; exit 0; fi; \
+		sleep 2; \
+	done; echo "ERROR: authentik-server got no LoadBalancer IP"; exit 1
+
+#e2e: @ E2E against Authentik on KinD (create -> deploy -> provision+verify -> destroy)
+e2e: deps-kind
+	@trap '$(MAKE) --no-print-directory kind-destroy >/dev/null 2>&1 || true' EXIT INT TERM; \
+	 $(MAKE) --no-print-directory kind-deploy && { \
+	   ip=$$($(KUBECTL) -n $(AUTHENTIK_NS) get svc authentik-server -o jsonpath='{.status.loadBalancer.ingress[0].ip}'); \
+	   echo "Polling LoadBalancer route https://$$ip:443/-/health/ready/ ..."; \
+	   ready=""; \
+	   for i in $$(seq 1 60); do \
+	     code=$$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 https://$$ip:443/-/health/ready/ 2>/dev/null || true); \
+	     if [ "$$code" = "204" ] || [ "$$code" = "200" ]; then ready=1; break; fi; sleep 2; \
+	   done; \
+	   if [ -z "$$ready" ]; then echo "ERROR: LB route not reachable"; exit 1; fi; \
+	   AUTHENTIK_E2E_SCHEME=https AUTHENTIK_E2E_HOST="$$ip:443" \
+	   go test -tags=e2e -count=1 -v -run TestE2E ./...; \
+	 }
+
+#kind-destroy: @ Delete the KinD cluster, stop cloud-provider-kind, prune kindccm-* sidecars
+kind-destroy:
+	@docker rm -f cloud-provider-kind >/dev/null 2>&1 || true
+	@orphans=$$(docker ps -aq --filter name=kindccm- 2>/dev/null); \
+	 if [ -n "$$orphans" ]; then docker rm -f $$orphans >/dev/null 2>&1 || true; fi
+	@kind delete cluster --name $(KIND_CLUSTER_NAME) >/dev/null 2>&1 || true
+
+#kind-up: @ Alias for kind-deploy
+kind-up: kind-deploy
+
+#kind-down: @ Alias for kind-destroy
+kind-down: kind-destroy
+
+#ci: @ Full local CI pipeline (fail-fast order)
+ci: static-check test build
+	@echo "Local CI pipeline passed."
+
+.PHONY: help deps deps-check check-toolchain-alignment build run test lint lint-docker \
+	vulncheck static-check image-build image-run update clean renovate-validate \
+	compose-up compose-down compose-logs e2e-compose deps-kind kind-create kind-deploy \
+	e2e kind-destroy kind-up kind-down ci

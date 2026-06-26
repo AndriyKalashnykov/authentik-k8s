@@ -25,7 +25,7 @@ func CreateConfiguration(scheme string, host string, token string) *api.Configur
 
 func CreateGroup(ctx context.Context, apiClient *api.APIClient, name string, isSuperuser bool) (*api.Group, *http.Response, error) {
 
-	return apiClient.CoreApi.CoreGroupsCreate(ctx).GroupRequest(api.GroupRequest{
+	return apiClient.CoreAPI.CoreGroupsCreate(ctx).GroupRequest(api.GroupRequest{
 		Name:        name,
 		IsSuperuser: util.BoolToPointer(isSuperuser),
 	}).Execute()
@@ -33,7 +33,7 @@ func CreateGroup(ctx context.Context, apiClient *api.APIClient, name string, isS
 
 func CreateUser(ctx context.Context, apiClient *api.APIClient, groupUID string, userName string, path string) (*api.User, *http.Response, error) {
 
-	return apiClient.CoreApi.CoreUsersCreate(ctx).UserRequest(api.UserRequest{
+	return apiClient.CoreAPI.CoreUsersCreate(ctx).UserRequest(api.UserRequest{
 		Name:     userName,
 		Username: userName,
 		Groups:   []string{groupUID}, // UID
@@ -44,11 +44,11 @@ func CreateUser(ctx context.Context, apiClient *api.APIClient, groupUID string, 
 
 func UpdateUserPassword(ctx context.Context, apiClient *api.APIClient, userID int32, pwd string) (*http.Response, error) {
 
-	passwordRequest := apiClient.CoreApi.CoreUsersSetPasswordCreate(ctx, userID).UserPasswordSetRequest(api.UserPasswordSetRequest{
+	passwordRequest := apiClient.CoreAPI.CoreUsersSetPasswordCreate(ctx, userID).UserPasswordSetRequest(api.UserPasswordSetRequest{
 		Password: pwd,
 	})
 
-	return apiClient.CoreApi.CoreUsersSetPasswordCreateExecute(passwordRequest)
+	return apiClient.CoreAPI.CoreUsersSetPasswordCreateExecute(passwordRequest)
 }
 
 func CreateUserToken(ctx context.Context, apiClient *api.APIClient, userID int32, tokenIdentifier string, tokenDescription string) (*api.Token, *http.Response, error) {
@@ -62,27 +62,27 @@ func CreateUserToken(ctx context.Context, apiClient *api.APIClient, userID int32
 		Expiring:    util.BoolToPointer(false),
 	}
 
-	return apiClient.CoreApi.CoreTokensCreate(ctx).TokenRequest(tr).Execute()
+	return apiClient.CoreAPI.CoreTokensCreate(ctx).TokenRequest(tr).Execute()
 }
 
 func UpdateUserToken(ctx context.Context, apiClient *api.APIClient, tokenIdentifier string, key string) (*http.Response, error) {
-	return apiClient.CoreApi.CoreTokensSetKeyCreate(ctx, tokenIdentifier).TokenSetKeyRequest(api.TokenSetKeyRequest{
+	return apiClient.CoreAPI.CoreTokensSetKeyCreate(ctx, tokenIdentifier).TokenSetKeyRequest(api.TokenSetKeyRequest{
 		Key: key,
 	}).Execute()
 
-	//return apiClient.CoreApi.CoreTokensSetKeyCreateExecute(apiClient.CoreApi.CoreTokensSetKeyCreate(ctx, tokenIdentifier).TokenSetKeyRequest(api.TokenSetKeyRequest{
+	//return apiClient.CoreAPI.CoreTokensSetKeyCreateExecute(apiClient.CoreAPI.CoreTokensSetKeyCreate(ctx, tokenIdentifier).TokenSetKeyRequest(api.TokenSetKeyRequest{
 	//	Key: key,
 	//}))
 }
 
 func RetrieveUserToken(ctx context.Context, apiClient *api.APIClient, tokenIdentifier string) (*api.TokenView, *http.Response, error) {
-	return apiClient.CoreApi.CoreTokensViewKeyRetrieveExecute(apiClient.CoreApi.CoreTokensViewKeyRetrieve(ctx, tokenIdentifier))
+	return apiClient.CoreAPI.CoreTokensViewKeyRetrieveExecute(apiClient.CoreAPI.CoreTokensViewKeyRetrieve(ctx, tokenIdentifier))
 }
 
 func ListUser(ctx context.Context, apiClient *api.APIClient, userName string) (*api.PaginatedUserList, *http.Response, error) {
-	return apiClient.CoreApi.CoreUsersList(ctx).Username(userName).Execute()
+	return apiClient.CoreAPI.CoreUsersList(ctx).Username(userName).Execute()
 }
 
 func MeRetrieveUser(ctx context.Context, apiClient *api.APIClient) (*api.SessionUser, *http.Response, error) {
-	return apiClient.CoreApi.CoreUsersMeRetrieveExecute(apiClient.CoreApi.CoreUsersMeRetrieve(ctx))
+	return apiClient.CoreAPI.CoreUsersMeRetrieveExecute(apiClient.CoreAPI.CoreUsersMeRetrieve(ctx))
 }

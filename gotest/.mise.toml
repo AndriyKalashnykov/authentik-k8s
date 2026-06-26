@@ -1,0 +1,13 @@
+[tools]
+# Go version MUST match the `go` directive in go.mod AND the Dockerfile's
+# ARG GO_VERSION (enforced by `make check-toolchain-alignment`).
+go = "1.26.4"
+# Lint + vuln tools (Go).
+"aqua:golangci/golangci-lint" = "2.12.2"
+"go:golang.org/x/vuln/cmd/govulncheck" = "1.4.0"
+# Dockerfile linter.
+"aqua:hadolint/hadolint" = "2.14.0"
+# Local Kubernetes (KinD e2e). cloud-provider-kind runs as a pinned host
+# container (see Makefile CLOUD_PROVIDER_KIND_VERSION), not a mise tool.
+"aqua:kubernetes-sigs/kind" = "0.32.0"
+"aqua:kubernetes/kubectl" = "1.36.2"
