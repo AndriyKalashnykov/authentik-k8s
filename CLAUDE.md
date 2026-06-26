@@ -1,0 +1,108 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What this repo is
+
+A proof-of-concept for driving [Authentik](https://goauthentik.io/) programmatically via its
+[Go client library](https://github.com/goauthentik/client-go). Two independent halves:
+
+1. **Deployment** — manifests + scripts to run an Authentik instance, either on Kubernetes (kind) or via Docker Compose.
+2. **`gotest/`** — a Go program that talks to a *running* Authentik instance's REST API to create groups, users, passwords, and OAuth tokens, then re-authenticates as a created user to read its group membership.
+
+The Go POC and the deployment are decoupled: you stand up Authentik first (compose or k8s), then point the POC at it.
+
+## Layout
+
+- `gotest/` — the Go POC (module `github.com/AndriyKalashnykov/authentik-k8s/gotest`, Go 1.26.x via `gotest/.mise.toml`, client `goauthentik.io/api/v3`).
+  - `main.go` — orchestration; all config read from env with fallback defaults (see `gotest/.env.example`).
+  - `internal/authentik/api.go` — thin wrappers over the client's `CoreApi` (CreateGroup, CreateUser, UpdateUserPassword, CreateUserToken, UpdateUserToken, RetrieveUserToken, MeRetrieveUser).
+  - `internal/util/utils.go` — TLS transport (skips verify), pointer helpers (`*bool`, `*int32`, `*string` — the client takes pointers for optional fields).
+  - `Dockerfile` — multi-stage, static binary on distroless-nonroot; a one-shot job (no port/healthcheck), config supplied via env at runtime (`make image-build` / `image-run`).
+  - `.env.example` — committed source of truth for the POC's env vars; copy to `.env` (gitignored). `e2e_test.go` is the build-tagged (`//go:build e2e`) live test driven by `make e2e-compose` / `make e2e`.
+- `k8s/postgresql/` — Authentik manifests (PostgreSQL backend), pre-generated via `helm template`, plus the `values.yml` used to generate them.
+- `k8s/kind-config.yaml` — single-node KinD cluster config used by `make e2e`.
+- `k8s/cockroachdb/` — experimental CockroachDB backend. **Known non-working**: CockroachDB lacks `pg_advisory_lock()`, which Authentik's Django migrations require (see README).
+- `compose/` — Docker Compose stack (Authentik server + worker + PostgreSQL + Redis). `compose/.env.example` is the committed source of truth; `compose/.env` is gitignored.
+- `scripts/` — `deploy-authentik-k8s.sh` (apply manifests, flip svc to LoadBalancer, wait, open browser) and `start-docker-compose-authentik.sh` (clean volumes, pull, up).
+- `renovate.json` — tracks every pinned version (go.mod, `.mise.toml`, Dockerfile FROM/ARG, Makefile `_VERSION` constants, compose + k8s image tags, GitHub Action SHAs).
+
+## Common commands
+
+```bash
+# --- Deploy Authentik (pick one) ---
+./scripts/start-docker-compose-authentik.sh   # Docker Compose: server on https://localhost:9443
+./scripts/deploy-authentik-k8s.sh             # Kubernetes: applies k8s/postgresql/, opens LB IP
+
+# --- Go POC: toolchain via mise (gotest/.mise.toml), targets in gotest/Makefile ---
+cd gotest
+cp .env.example .env   # one-time: per-dev config (gitignored); main.go also has the same fallbacks
+make deps     # install mise (if missing) + pinned Go/golangci-lint/govulncheck/hadolint/kind/kubectl
+make ci       # full local pipeline: static-check (align+lint+hadolint+vulncheck) + test + build
+make run      # run the POC against a running Authentik (sources .env.example then .env)
+make test     # go test ./...  (unit + hermetic httptest contract tests)
+make image-build / image-run   # build/run the POC container (config via --env-file)
+make help     # list all targets
+
+# --- Run Authentik + POC end-to-end (two alternatives) ---
+make e2e-compose   # lightweight: Authentik via Docker Compose, then provision + verify, then down
+make e2e           # full cluster: KinD + cloud-provider-kind (== kind-up + test + kind-down)
+make kind-up / kind-down        # bring the KinD Authentik stack up / tear it down
+make compose-up / compose-down  # bring the Compose Authentik stack up / tear it down
+
+make renovate-validate          # validate renovate.json
+
+# --- Regenerate the k8s manifests from the Helm chart ---
+helm repo add authentik https://charts.goauthentik.io && helm repo update
+helm template authentik authentik/authentik -f ./k8s/postgresql/values.yml > ./k8s/postgresql/authentik-postgresql.yml
+```
+
+Default admin login (both deployments): `akadmin` / `Authentik01234567890!`.
+
+## Environment configuration (`.env.example`)
+
+Every operator-tunable value is externalized to env vars — **no hardcoded
+hosts/ports/secrets in code**. Each consumer has a committed `.env.example`
+(the source of truth, documenting every variable + default) and a gitignored
+`.env` (per-developer override). Copy and edit:
+
+```bash
+cp gotest/.env.example   gotest/.env     # Go POC: AUTHENTIK_SCHEME/HOST/BOOTSTRAP_TOKEN/USER_PASSWORD/ORG*/…
+cp compose/.env.example  compose/.env    # Compose stack: PG_*, AUTHENTIK_SECRET_KEY, BOOTSTRAP_*, AUTHENTIK_TAG, …
+```
+
+- `gotest/main.go` reads each var via `os.LookupEnv` with a fallback that
+  mirrors `.env.example`, so it works with or without a `.env`. `make run`
+  sources `.env.example` then `.env`; `make image-run` passes `--env-file`.
+- `make compose-up`/`make e2e-compose` auto-seed `compose/.env` from the
+  example if it is missing.
+- **Contract**: `AUTHENTIK_BOOTSTRAP_TOKEN` in `gotest/.env*` must match the
+  token in whichever deployment the POC targets (`compose/.env*` for compose;
+  the committed `AUTHENTIK_BOOTSTRAP_TOKEN` in `k8s/postgresql/authentik-postgresql.yml`
+  for k8s). The shipped defaults already match.
+- The values in the committed `.env.example` files are **demo credentials** —
+  rotate them for any real deployment.
+
+## Architecture notes that span files
+
+- **The bootstrap token is a shared secret across the POC and the deployment.** The POC's `AUTHENTIK_BOOTSTRAP_TOKEN` (env, default in `gotest/.env.example`) MUST equal the `AUTHENTIK_BOOTSTRAP_TOKEN` of whatever it targets: `compose/.env*` for the Compose stack, or the committed value in `k8s/postgresql/authentik-postgresql.yml` (on both the `authentik-server` and `authentik-worker` Deployments) for k8s. The POC authenticates as admin using this token. The shipped defaults already match across all three; change it in lockstep.
+
+- **The POC's target is env-driven** — `AUTHENTIK_SCHEME` (default `https`) + `AUTHENTIK_HOST` (default `127.0.0.1:9443`, the Compose endpoint). For k8s use `AUTHENTIK_HOST=<LB-IP>:443`. The KinD e2e (`make e2e`) resolves the LoadBalancer IP and passes it automatically; for a manual `make run` against k8s, set `AUTHENTIK_HOST` in `gotest/.env`.
+
+- **TLS verification is intentionally skipped** (`util.GetTLSTransport(true)`) because the dev instances use self-signed certs. Do not "fix" this without changing the deployment to use trusted certs.
+
+- **POC flow** (`CreateGroupsAndUsers`, called 4× for org-01/org-02 × admin/user): create group → create user in group → set password → create API token → retrieve the Authentik-generated key → overwrite it with a known key → re-create an API client *as that user* with the known token → call `MeRetrieveUser` to read the user's groups. The final step demonstrates a non-privileged token can read its own group membership.
+
+- **Manifests are committed artifacts generated from `values.yml`** — but with **two intentional hand-edits**: (1) the `AUTHENTIK_BOOTSTRAP_PASSWORD`/`AUTHENTIK_BOOTSTRAP_TOKEN` env on server+worker; (2) the PostgreSQL and Redis workloads were swapped from the chart's **Bitnami subchart images (removed from Docker Hub in 2025)** to **OSS Deployments** — `postgres:16-alpine` and `valkey/valkey:8-alpine` (Valkey = the BSD/Linux-Foundation Redis fork). They keep the original Service selectors/ports and read DB creds from the `authentik` Secret, so `authentik-server` connects unchanged. **Regenerating from the chart reintroduces Bitnami** — re-apply the OSS swap after any `helm template` (or disable the chart's bundled `postgresql`/`redis` and point Authentik at the OSS workloads). A few now-unused Bitnami `ConfigMap`s (redis-scripts/health/config, pg-extended-config) remain as harmless dead config.
+
+- **Namespace mismatch between manifests and the deploy script (real bug).** Every resource in `k8s/postgresql/authentik-postgresql.yml` is pinned to `namespace: "default"`, so `kubectl apply -f` lands them in `default`. But `deploy-authentik-k8s.sh` then runs its `patch`/`wait` against `-n threeport-api` (empty). When touching the k8s deploy path, reconcile these two — don't propagate `threeport-api`.
+
+## Conventions
+
+- Config is externalized to env vars with fallback defaults (no hardcoded hosts/ports/secrets); see the Environment configuration section. Renovate tracks every pinned version (`renovate.json`); validate with `make renovate-validate`.
+- The client library takes pointers for optional request fields; use the `util.*ToPointer` helpers rather than inlining `&`.
+- **CI**: `.github/workflows/ci.yml` runs `make static-check` + `make build` + `make test` via `jdx/mise-action` (toolchain from `gotest/.mise.toml`). The Go project is in `gotest/`, so jobs set `working-directory: gotest`. A `dorny/paths-filter` `changes` job gates the heavy jobs on `gotest/**`/`.github/workflows/**`/`CLAUDE.md` edits — doc/k8s/compose/scripts changes skip CI; a `ci-pass` job aggregates results. No tags/publish/e2e (the POC needs a live Authentik instance). No secrets required.
+- The local quality gate (`gotest/Makefile` → `make ci`: golangci-lint + govulncheck + go-mod-tidy + toolchain-alignment) mirrors CI. `.golangci.yml` runs the standard linters; gosec is intentionally omitted (the POC hardcodes test tokens and skips TLS verify by design — documented in `.golangci.yml`).
+- **Test layers**:
+  - *Unit + hermetic httptest contracts* (`make test`, no infra): `internal/authentik` (100%) — `CreateConfiguration` auth-header contract + httptest contracts for every `CoreApi` wrapper at the real `/api/v3/...` paths; `internal/util` (87.5%); `main` (66%) — `CreateGroupsAndUsers` whole-flow vs a mock Authentik (`main_test.go`). `CreateGroupsAndUsers` returns `error` (not `log.Panicf`) so the flow is testable.
+  - *Live e2e* (`e2e_test.go`, build tag `e2e`) — drives the full flow against a real Authentik and verifies persistence with the admin + the created user's token. Two ways to run it: `make e2e-compose` (Authentik via Docker Compose — lightweight) or `make e2e` (KinD + cloud-provider-kind — full cluster). Both read `AUTHENTIK_E2E_*` env and self-tear-down. Excluded from `make test`.

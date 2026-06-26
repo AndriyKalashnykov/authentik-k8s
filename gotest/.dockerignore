@@ -1,0 +1,9 @@
+# Keep the build context lean and secrets out of image layers.
+.env
+.env.*
+!.env.example
+bin/
+*_test.go
+.idea/
+Dockerfile
+.dockerignore

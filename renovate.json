@@ -1,6 +1,53 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": [
-    "config:recommended"
+  "extends": ["config:recommended"],
+  "timezone": "UTC",
+  "kubernetes": {
+    "managerFilePatterns": ["/k8s/.+\\.ya?ml$/"]
+  },
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Makefile tool-version constants (e.g. CLOUD_PROVIDER_KIND_VERSION) pinned via # renovate: comments. currentValue must start with a digit so image refs are handled by the dedicated manager below.",
+      "managerFilePatterns": ["/(^|/)Makefile$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)(?: versioning=(?<versioning>\\S+))?(?: extractVersion=(?<extractVersion>\\S+))?\\s+[A-Z0-9_]+\\s*:?=\\s*(?<currentValue>[0-9][^\\s@]*)"
+      ]
+    },
+    {
+      "customType": "regex",
+      "description": "Makefile KIND_NODE_IMAGE — kindest/node tag + digest.",
+      "managerFilePatterns": ["/(^|/)Makefile$/"],
+      "datasourceTemplate": "docker",
+      "matchStrings": [
+        "# renovate: datasource=docker depName=(?<depName>\\S+)\\s+KIND_NODE_IMAGE\\s*:?=\\s*\\S+:(?<currentValue>v[0-9.]+)@(?<currentDigest>sha256:[a-f0-9]+)"
+      ]
+    },
+    {
+      "customType": "regex",
+      "description": "Env-file image tags (compose/.env*) pinned via # renovate: comments.",
+      "managerFilePatterns": ["/(^|/)\\.env(\\.example)?$/"],
+      "matchStrings": [
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)(?: versioning=(?<versioning>\\S+))?\\s+[A-Z0-9_]+=(?<currentValue>\\S+)"
+      ]
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Group the Go toolchain across go.mod, .mise.toml and the Dockerfile so they bump as a unit (paired with `make check-toolchain-alignment`).",
+      "groupName": "go toolchain",
+      "matchManagers": ["gomod", "mise", "dockerfile"],
+      "matchPackageNames": ["go", "golang"]
+    },
+    {
+      "description": "Group the local Kubernetes toolchain (kind / kubectl / node image / cloud-provider-kind).",
+      "groupName": "kubernetes toolchain",
+      "matchPackageNames": [
+        "kubernetes-sigs/kind",
+        "kubernetes/kubectl",
+        "kubernetes-sigs/cloud-provider-kind",
+        "kindest/node"
+      ]
+    }
   ]
 }

@@ -1,0 +1,11 @@
+version: "2"
+
+# Standard set: errcheck, govet, ineffassign, staticcheck, unused.
+#
+# gosec is intentionally NOT enabled: this is a proof-of-concept that hardcodes
+# test tokens (main.go) and skips TLS verification for self-signed dev certs
+# (internal/util/utils.go). Both are deliberate POC behavior; enabling gosec
+# would flag intentional code, not real defects. Revisit if this graduates
+# beyond a POC.
+linters:
+  default: standard

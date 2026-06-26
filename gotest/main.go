@@ -2,156 +2,163 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
+	"os"
 
 	"github.com/AndriyKalashnykov/authentik-k8s/gotest/internal/authentik"
 	api "goauthentik.io/api/v3"
 )
 
+// Fallback defaults. These mirror .env.example so the program works without a
+// .env file; the Makefile/Docker run paths source .env and override them. They
+// are the same demo values already committed in the k8s manifests / compose,
+// not new secrets — operators override via env for a real deployment.
 const (
-	AuthentikServerScheme         = "https"
-	AuthentikServerHost           = "127.0.0.1:9443"                                               //"172.18.255.200:443"
-	AuthentikBootstrapToken       = "NoMlxBQuYgfu3j19ygGqhjXenAjrJgOfN5naqmSDBUhdLjYqHKze7yyzY07H" // see AUTHENTIK_BOOTSTRAP_TOKEN in K8s manifests
-	Orgs                          = "orgs/"
-	Org1                          = "org-01"
-	Org2                          = "org-02"
-	GroupOrg1Admins               = Org1 + "-admins"
-	GroupOrg1AdminsIsSuperUser    = true // can login to Authentic admin Web UI interface
-	GroupOrg1Admin                = Org1 + "-admin"
-	GroupOrg1AdminPwd             = "Authentik01234567890!"
-	GroupOrg1AdminToken           = "ZId4CDEtmHbnuxkJH2ehUzHgYeTmOansuCO0JsTTsZnYB1z9N0WoAutpyH4i"
-	GroupOrg1AdminTokenIdentifier = GroupOrg1Admin + "-token"
-	GroupOrg1Users                = Org1 + "-users"
-	GroupOrg1UsersIsSuperUser     = false // can login to Authentic admin Web UI interface
-	GroupOrg1User                 = Org1 + "-user"
-	GroupOrg1UserPwd              = GroupOrg1AdminPwd
-	GroupOrg1UserToken            = "e3qVF1uGTL5DKjglvMKpDYk60X7s89jnbNh9nPEpFYzSgoOHYDSMi0xxYhYr"
-	GroupOrg1UserTokenIdentifier  = GroupOrg1User + "-token"
-
-	GroupOrg2Admins               = Org2 + "-admins"
-	GroupOrg2AdminsIsSuperUser    = true // can login to Authentic admin Web UI interface
-	GroupOrg2Admin                = Org2 + "-admin"
-	GroupOrg2AdminPwd             = GroupOrg1AdminPwd
-	GroupOrg2AdminToken           = "ZId4CDEtmHbnuxkJH2ehUzHgYeTmOansuCO0JsTTsZnYB1z9N0WoAutpyH4i"
-	GroupOrg2AdminTokenIdentifier = GroupOrg2Admin + "-token"
-	GroupOrg2Users                = Org2 + "-users"
-	GroupOrg2UsersIsSuperUser     = false // can login to Authentic admin Web UI interface
-	GroupOrg2User                 = Org2 + "-user"
-	GroupOrg2UserPwd              = GroupOrg1AdminPwd
-	GroupOrg2UserToken            = "svkH90FMYlnXPA5JHxePVQkozTjXReT6rsdQ2BXedwI5mtrFYR5mfrunMt4B"
-	GroupOrg2UserTokenIdentifier  = GroupOrg2User + "-token"
+	defaultScheme         = "https"
+	defaultHost           = "127.0.0.1:9443" // k8s LoadBalancer form: "<LB-IP>:443"
+	defaultBootstrapToken = "NoMlxBQuYgfu3j19ygGqhjXenAjrJgOfN5naqmSDBUhdLjYqHKze7yyzY07H"
+	defaultUserPassword   = "Authentik01234567890!"
+	defaultOrg1           = "org-01"
+	defaultOrg2           = "org-02"
+	defaultOrg1AdminToken = "ZId4CDEtmHbnuxkJH2ehUzHgYeTmOansuCO0JsTTsZnYB1z9N0WoAutpyH4i"
+	defaultOrg1UserToken  = "e3qVF1uGTL5DKjglvMKpDYk60X7s89jnbNh9nPEpFYzSgoOHYDSMi0xxYhYr"
+	defaultOrg2AdminToken = "ZId4CDEtmHbnuxkJH2ehUzHgYeTmOansuCO0JsTTsZnYB1z9N0WoAutpyH4i"
+	defaultOrg2UserToken  = "svkH90FMYlnXPA5JHxePVQkozTjXReT6rsdQ2BXedwI5mtrFYR5mfrunMt4B"
 )
 
+// env returns the value of key, or fallback when unset/empty.
+func env(key, fallback string) string {
+	if v, ok := os.LookupEnv(key); ok && v != "" {
+		return v
+	}
+	return fallback
+}
+
+// CreateGroupsAndUsers provisions one group + one user against Authentik, sets the
+// user's password and OAuth token, then re-authenticates as that user to read its
+// group membership. It returns an error (rather than panicking) so callers — and
+// the whole-flow contract test — can drive every step and assert the outcome.
 func CreateGroupsAndUsers(ctx context.Context, authentikServerScheme string, authentikServerHost string, authentikBootstrapToken string, groupName string, isGroupSuperUser bool,
-	userName string, userPath string, userPassword string, userTokenIdentifier string, userToken string) {
+	userName string, userPath string, userPassword string, userTokenIdentifier string, userToken string) error {
 
 	// create authentic API client using AuthentikBootstrapToken used during Authentik deployment
 	akadminConfig := authentik.CreateConfiguration(authentikServerScheme, authentikServerHost, authentikBootstrapToken)
 	akadminApiClient := api.NewAPIClient(akadminConfig)
 
-	// create a group
-	// will create new group with different pk
+	// create a group (creates a new group with a fresh pk)
 	grp, _, err := authentik.CreateGroup(ctx, akadminApiClient, groupName, isGroupSuperUser)
 	if err != nil {
-		log.Panicf("error: %v", err)
+		return fmt.Errorf("create group %q: %w", groupName, err)
 	}
 	groupUID := grp.Pk
 	log.Printf("groupUID: %v\n", groupUID)
 
-	// create a user and assign it to previously created group
+	// create a user and assign it to the previously created group
 	usr, _, err := authentik.CreateUser(ctx, akadminApiClient, groupUID, userName, userPath)
 	if err != nil {
-		log.Panicf("error: %v", err)
+		return fmt.Errorf("create user %q: %w", userName, err)
 	}
 	userUID := usr.Pk
 	log.Printf("userUID: %v\n", userUID)
 
-	// create user's password
-	resp, err := authentik.UpdateUserPassword(ctx, akadminApiClient, userUID, userPassword)
-	if err != nil {
-		log.Panicf("error: %v", err)
-	}
-	if resp != nil {
-
+	// set the user's password
+	if _, err = authentik.UpdateUserPassword(ctx, akadminApiClient, userUID, userPassword); err != nil {
+		return fmt.Errorf("set password for user %q: %w", userName, err)
 	}
 
-	// create user's OAuth token
-	token, resp, err := authentik.CreateUserToken(ctx, akadminApiClient, userUID, userTokenIdentifier, userTokenIdentifier)
+	// create the user's OAuth token
+	token, _, err := authentik.CreateUserToken(ctx, akadminApiClient, userUID, userTokenIdentifier, userTokenIdentifier)
 	if err != nil {
-		log.Panicf("error: %v", err)
+		return fmt.Errorf("create token %q: %w", userTokenIdentifier, err)
 	}
 	if token != nil {
 		log.Printf("Token: %v", token)
 	}
 
-	// retrieve user's OAuth token generated by Authentik
+	// retrieve the Authentik-generated token key
 	tv, _, err := authentik.RetrieveUserToken(ctx, akadminApiClient, userTokenIdentifier)
 	if err != nil {
-		log.Panicf("error: %v", err)
+		return fmt.Errorf("retrieve generated token %q: %w", userTokenIdentifier, err)
 	}
 	if tv != nil {
 		log.Printf("OAuth token: %v", tv.Key)
 	}
 
-	// update user's OAuth token with custom key value
-	resp, err = authentik.UpdateUserToken(ctx, akadminApiClient, userTokenIdentifier, userToken)
+	// overwrite the token key with a custom value
+	resp, err := authentik.UpdateUserToken(ctx, akadminApiClient, userTokenIdentifier, userToken)
 	if err != nil {
-		log.Printf("error: %v", err)
+		return fmt.Errorf("set custom key for token %q: %w", userTokenIdentifier, err)
 	}
-	if tv != nil {
+	if resp != nil {
 		log.Printf("resp: %v", resp.Body)
 	}
 
-	// retrieve user's OAuth token with custom key value
+	// retrieve the token again to confirm the custom key took effect
 	tvnew, _, err := authentik.RetrieveUserToken(ctx, akadminApiClient, userTokenIdentifier)
 	if err != nil {
-		log.Panicf("error: %v", err)
+		return fmt.Errorf("retrieve custom token %q: %w", userTokenIdentifier, err)
 	}
-	if tv != nil {
-		log.Printf("OAuth token: %v", tvnew.Key)
-	}
+	log.Printf("OAuth token: %v", tvnew.Key)
 
-	// check if Oauth token was set
+	// confirm the custom key was set
 	if tvnew.Key == userToken {
-		log.Printf("GroupOrg1AdminToken was set ")
+		log.Printf("custom token for %q was set", userName)
 	} else {
-		log.Printf("Something went wrong: setting GroupOrg1AdminToken")
+		log.Printf("something went wrong setting the custom token for %q", userName)
 	}
 
-	// create authentic API client using user's Oauth token from previous step
+	// create an API client as the new user using its OAuth token
 	userConfig := authentik.CreateConfiguration(authentikServerScheme, authentikServerHost, tvnew.Key)
 	userApiClient := api.NewAPIClient(userConfig)
 
-	// get user's info
+	// read the user's own info (which groups it belongs to)
 	su, _, err := authentik.MeRetrieveUser(ctx, userApiClient)
 	if err != nil {
-		log.Panicf("error: %v", err)
+		return fmt.Errorf("retrieve self for user %q: %w", userName, err)
 	}
 	if su != nil {
 		log.Printf("User Groups: %v", su.GetUser().Groups)
 	}
 
-	// can this user create a group?
-	//grp, _, err = authentik.CreateGroup(ctx, userApiClient, "demo-group-created-by-"+userName, false)
-	//if err != nil {
-	//	log.Printf("error: %v", err)
-	//}
-	//groupUID = grp.Pk
-	//log.Printf("groupUID: %v\n", groupUID)
+	return nil
 }
 
 func main() {
 	ctx := context.Background()
 
-	// org1 admin + user
-	CreateGroupsAndUsers(ctx, AuthentikServerScheme, AuthentikServerHost, AuthentikBootstrapToken, GroupOrg1Admins, GroupOrg1AdminsIsSuperUser, GroupOrg1Admin, Orgs+Org1, GroupOrg1AdminPwd,
-		GroupOrg1AdminTokenIdentifier, GroupOrg1AdminToken)
-	CreateGroupsAndUsers(ctx, AuthentikServerScheme, AuthentikServerHost, AuthentikBootstrapToken, GroupOrg1Users, GroupOrg1UsersIsSuperUser, GroupOrg1User, Orgs+Org1, GroupOrg1UserPwd,
-		GroupOrg1UserTokenIdentifier, GroupOrg1UserToken)
+	// Connection + shared config, externalized to env (see .env.example).
+	scheme := env("AUTHENTIK_SCHEME", defaultScheme)
+	host := env("AUTHENTIK_HOST", defaultHost)
+	bootstrapToken := env("AUTHENTIK_BOOTSTRAP_TOKEN", defaultBootstrapToken)
+	password := env("AUTHENTIK_USER_PASSWORD", defaultUserPassword)
+	org1 := env("AUTHENTIK_ORG1", defaultOrg1)
+	org2 := env("AUTHENTIK_ORG2", defaultOrg2)
 
-	// org2 admin + user
-	CreateGroupsAndUsers(ctx, AuthentikServerScheme, AuthentikServerHost, AuthentikBootstrapToken, GroupOrg2Admins, GroupOrg2AdminsIsSuperUser, GroupOrg2Admin, Orgs+Org2, GroupOrg2AdminPwd,
-		GroupOrg2AdminTokenIdentifier, GroupOrg2AdminToken)
-	CreateGroupsAndUsers(ctx, AuthentikServerScheme, AuthentikServerHost, AuthentikBootstrapToken, GroupOrg2Users, GroupOrg2UsersIsSuperUser, GroupOrg2User, Orgs+Org2, GroupOrg2UserPwd,
-		GroupOrg2UserTokenIdentifier, GroupOrg2UserToken)
+	// One provisioning request per (org, role). Names are derived from the org;
+	// the per-user OAuth token keys are externalized to env.
+	type provision struct {
+		org       string
+		role      string // "admin" | "user"
+		group     string // "admins" | "users"
+		superuser bool   // admins can log into the Authentik admin UI
+		token     string
+	}
+	requests := []provision{
+		{org1, "admin", "admins", true, env("AUTHENTIK_ORG1_ADMIN_TOKEN", defaultOrg1AdminToken)},
+		{org1, "user", "users", false, env("AUTHENTIK_ORG1_USER_TOKEN", defaultOrg1UserToken)},
+		{org2, "admin", "admins", true, env("AUTHENTIK_ORG2_ADMIN_TOKEN", defaultOrg2AdminToken)},
+		{org2, "user", "users", false, env("AUTHENTIK_ORG2_USER_TOKEN", defaultOrg2UserToken)},
+	}
+
+	for _, r := range requests {
+		groupName := r.org + "-" + r.group
+		userName := r.org + "-" + r.role
+		tokenIdentifier := userName + "-token"
+		userPath := "orgs/" + r.org
+		if err := CreateGroupsAndUsers(ctx, scheme, host, bootstrapToken,
+			groupName, r.superuser, userName, userPath, password, tokenIdentifier, r.token); err != nil {
+			log.Fatalf("error: %v", err)
+		}
+	}
 }

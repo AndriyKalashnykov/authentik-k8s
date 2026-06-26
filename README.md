@@ -1,224 +1,230 @@
 [![Hits](https://hits.sh/github.com/AndriyKalashnykov/authentik-k8s.svg?view=today-total&style=plastic)](https://hits.sh/github.com/AndriyKalashnykov/authentik-k8s/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-brightgreen.svg)](https://opensource.org/licenses/MIT)
-# POC for [Authentik](https://goauthentik.io/) [Go client library](https://github.com/goauthentik/client-go)
 
-- K8s deployment
-- [gotest](/gotest), POC project utilizing [goauthentik/client-go](https://github.com/goauthentik/client-go), programmatically creates Users, Groups, OAuth tokens etc.
-  - create Group
-  - create User
-  - create User's password
-  - create User's OAuth token
-  - get User's Groups (using User's OAuth token)
+# authentik-k8s — Authentik provisioning POC (Go client)
 
-## Requirements
+A proof-of-concept that drives [Authentik](https://goauthentik.io/) programmatically via its Go client library [`goauthentik.io/api/v3`](https://github.com/goauthentik/client-go) — creating groups, users, passwords and OAuth tokens, then re-authenticating as a created user to read its group membership. It ships with two ways to stand up Authentik (Docker Compose or KinD) plus the Go POC that runs against it.
 
-- [gvm](https://github.com/moovweb/gvm) Go 1.22.4
-    ```bash
-    gvm install go1.22.4 --prefer-binary --with-build-tools --with-protobuf
-    gvm use go1.22.4 --default
-    ```
-- [kind](https://kind.sigs.k8s.io/docs/user/quick-start/#installation)
-- [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl)
-- [docker](https://docs.docker.com/get-docker/)
-- [docker-compose](https://docs.docker.com/compose/install/)
-  ```bash
-  sudo apt-get install -y docker-compose
-  ```
+## Overview
 
-## K8s
+The repo has two halves:
 
-### Deploy on K8s (PostgreSQL)
+- **Deploy Authentik** — locally via Docker Compose (lightweight) or on a full Kubernetes cluster via KinD (with `cloud-provider-kind` for LoadBalancer support and OSS PostgreSQL + Valkey datastores).
+- **The Go POC** (`gotest/`) — uses the Authentik Go client to provision a small demo org structure and verify it end-to-end against the running instance.
 
-Authentik manifests already generated with Authentik Helm chart and configures with `AUTHENTIK_BOOTSTRAP_PASSWORD` and `AUTHENTIK_BOOTSTRAP_TOKEN` if you need 
-to change them see next chapter first.
+```mermaid
+flowchart LR
+    POC["POC binary (gotest/)<br/>Go client goauthentik.io/api/v3"]
 
-Execute script to deploy manifests and open browser window, login: `akadmin`, pwd: `Authentik01234567890!`
+    subgraph AUTHENTIK["Authentik stack — run EITHER way"]
+        direction TB
+        SERVER["Authentik server<br/>REST API + Web UI"]
+        WORKER["Authentik worker<br/>background tasks"]
+        PG[("PostgreSQL")]
+        REDIS[("Redis / Valkey")]
+        SERVER --- WORKER
+        SERVER --> PG
+        SERVER --> REDIS
+        WORKER --> PG
+        WORKER --> REDIS
+    end
 
-```bash
-./scripts/deploy-authentik-k8s.sh
+    POC -->|"HTTPS REST API + admin bootstrap token"| SERVER
+
+    COMPOSE["Option A: Docker Compose (compose/)<br/>target https://127.0.0.1:9443"]
+    KIND["Option B: KinD + cloud-provider-kind (k8s/)<br/>LoadBalancer IP, target https://LB-IP:443<br/>postgres:16-alpine, valkey:8-alpine"]
+
+    COMPOSE -.deploys.-> AUTHENTIK
+    KIND -.deploys.-> AUTHENTIK
+
+    classDef poc fill:#e3f2fd,stroke:#1565c0,color:#0d47a1;
+    classDef svc fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20;
+    classDef data fill:#fff3e0,stroke:#ef6c00,color:#e65100;
+    classDef deploy fill:#f3e5f5,stroke:#6a1b9a,color:#4a148c;
+    class POC poc;
+    class SERVER,WORKER svc;
+    class PG,REDIS data;
+    class COMPOSE,KIND deploy;
 ```
 
-## Create Authentik k8s manifests using Helm
+Everything is configured through environment variables — there are no hardcoded hosts, ports or secrets. Each consumer ships a committed `.env.example` (the source of truth) and reads an optional gitignored `.env` for overrides.
 
-```bash
-helm repo add authentik https://charts.goauthentik.io
-helm repo update
+## Quick start
 
-helm template authentik authentik/authentik -f ./k8s/postgresql/values.yml > ./k8s/postgresql/authentik-postgresql.yml
-```
-
-If you want to set predefined `password` and `token` for the default admin user `akadmin`:
-
-edit `./k8s/postgresql/authentik-postgresql.yml` ->  Deployment `authentik-server`
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: authentik-server
-  ...
-spec:
-  ...
-  template:
-    ...
-    spec:
-      containers:
-        - name: authentik
-          ...
-          env:            
-            ...
-            - name: AUTHENTIK_BOOTSTRAP_PASSWORD
-              value: "Authentik01234567890!"
-            - name: AUTHENTIK_BOOTSTRAP_TOKEN
-              value: "NoMlxBQuYgfu3j19ygGqhjXenAjrJgOfN5naqmSDBUhdLjYqHKze7yyzY07H"
-```
-
-edit `./k8s/postgresql/authentik-postgresql.yml` ->  Deployment `authentik-worker`
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: authentik-worker
-  ...
-spec:
-  ...
-  template:
-    ...
-    spec:
-      ...
-      containers:
-        - name: authentik
-          ...
-          env:            
-            ...
-            - name: AUTHENTIK_BOOTSTRAP_PASSWORD
-              value: "Authentik01234567890!"
-            - name: AUTHENTIK_BOOTSTRAP_TOKEN
-              value: "NoMlxBQuYgfu3j19ygGqhjXenAjrJgOfN5naqmSDBUhdLjYqHKze7yyzY07H"
-```
-
-### ### Deploy on K8s (CockroachDB, experimental, not working yet)
-
-```bash
-# create manifests if needed
-helm template crdb cockroachdb/cockroachdb --namespace default \
---set fullnameOverride=crdb \
---set single-node=true \
---set statefulset.replicas=1 > ./k8s/cockroachdb/cockroachdb.yml
-
-# create namespace
-kubectl create ns threeport-api
-
-# deploy cockroachdb
-kubectl apply -f ./k8s/cockroachdb/cockroachdb.yml
-echo "waiting for cockroachdb to get ready"
-kubectl wait pod -n threeport-api crdb-0 --for condition=Ready --timeout=180s
-
-# deploy authentik
-kubectl apply -f ./k8s/cockroachdb/authentik-cockroachdb.yml
-kubectl apply -f ./k8s/cockroachdb/crdb-test-pod.yml
-
-# undeploy authentik
-kubectl delete -f ./k8s/cockroachdb/authentik-cockroachdb.yml
-
-# undeploy cockroachdb
-kubectl delete -f ./k8s/cockroachdb/cockroachdb.yml
-kubectl delete -f ./k8s/cockroachdb/crdb-test-pod.yml
-```
-
-### Python/CockroachDB error
-
-```log
-✔ 14:31 ~/projects/authentik-k8s [ main|✚ 1] $ k logs -n threeport-api authentik-server-5cc447f9fb-8wwv2 
-Defaulted container "authentik" out of: authentik, db-init (init)
-{"event": "Loaded config", "level": "debug", "logger": "authentik.lib.config", "timestamp": 1674588685.27217, "file": "/authentik/lib/default.yml"}
-{"event": "Loaded environment variables", "level": "debug", "logger": "authentik.lib.config", "timestamp": 1674588685.2725286, "count": 46}
-{"event": "Starting authentik bootstrap", "level": "info", "logger": "authentik.lib.config", "timestamp": 1674588685.2726445}
-{"event": "PostgreSQL connection successful", "level": "info", "logger": "authentik.lib.config", "timestamp": 1674588685.2753716}
-{"event": "Redis Connection successful", "level": "info", "logger": "authentik.lib.config", "timestamp": 1674588685.27696}
-{"event": "Finished authentik bootstrap", "level": "info", "logger": "authentik.lib.config", "timestamp": 1674588685.276978}
-{"event": "Bootstrap completed", "level": "info", "logger": "bootstrap"}
-{"event": "Loaded config", "level": "debug", "logger": "authentik.lib.config", "timestamp": 1674588685.4033535, "file": "/authentik/lib/default.yml"}
-{"event": "Loaded environment variables", "level": "debug", "logger": "authentik.lib.config", "timestamp": 1674588685.4036634, "count": 46}
-2023-01-24 19:31:25 [info     ] applying django migrations
-2023-01-24 19:31:25 [info     ] waiting to acquire database lock
-Traceback (most recent call last):
-  File "<frozen runpy>", line 198, in _run_module_as_main
-  File "<frozen runpy>", line 88, in _run_code
-  File "/lifecycle/migrate.py", line 83, in <module>
-    wait_for_lock()
-  File "/lifecycle/migrate.py", line 40, in wait_for_lock
-    curr.execute("SELECT pg_advisory_lock(%s)", (ADV_LOCK_UID,))
-psycopg2.errors.UndefinedFunction: unknown function: pg_advisory_lock(): function undefined
-
-```
-
-Root cause: `psycopg2.errors.UndefinedFunction: unknown function: pg_advisory_lock(): function undefined`
-
-- [sql: fill out pg_advisory_lock stubs](https://github.com/cockroachdb/cockroach/issues/13546)
-- [CockroachDB does not support pg_advisory_loc() function today](https://github.com/golang-migrate/migrate/issues/703)
-- [Support for CockroachDB](https://github.com/goharbor/harbor/issues/8649)
-
-
-## Docker Compose
-
-### Run using docker-compose
-
-```bash
-./scripts/start-docker-compose-authentik.sh
-```
-
-## Run POC 
-
-Run POC to perform following using [goauthentik/client-go](https://github.com/goauthentik/client-go)
-- create `qleetctl` user 
-- create `qleetctl` user's `passowrd` and `token`
-- create `QleetOS` group
-- assing `qleetctl` user to `QleetOS` group
-- use `qleetctl` user's `token` to find which groups it belong to
+The fastest happy path — start Authentik with Compose, then run the POC against it:
 
 ```bash
 cd gotest
-make run
+make deps          # one-time: install the toolchain (mise + Go/lint/kind/kubectl)
+make compose-up    # start Authentik (PostgreSQL + Redis + server + worker), wait until ready
+make run           # run the POC against https://127.0.0.1:9443
+make compose-down  # tear it down (removes volumes)
 ```
 
-## Login to Authentik Web Admin inteface
+## Prerequisites
 
-Docker Compose
+- [Docker](https://docs.docker.com/get-docker/) (and the Compose plugin) — the only hard prerequisite.
+- Everything else (Go, golangci-lint, govulncheck, hadolint, kind, kubectl) is installed via [mise](https://mise.jdx.dev):
+
 ```bash
-echo "login: akadmin, pwd: Authentik01234567890!"
-xdg-open https://localhost:9443/if/admin/#/administration/overview
+cd gotest
+make deps   # installs mise (if missing) + the pinned toolchain from .mise.toml
 ```
 
-Kubernetes
+## Configuration
+
+All config is externalized to environment variables. Each consumer has a committed `.env.example` (source of truth) and a gitignored `.env` for your overrides:
+
 ```bash
-LB_IP=$(kubectl get svc/authentik -o=jsonpath='{.status.loadBalancer.ingress[0].ip}')
-echo "login: akadmin, pwd: Authentik01234567890!"
-xdg-open https://$LB_IP:443/if/admin/#/administration/overview
+cp gotest/.env.example  gotest/.env     # POC config
+cp compose/.env.example compose/.env    # Compose stack config
 ```
 
-Login
-![](./docs/img/login.jpg "Login")
+| File | Key variables |
+|------|---------------|
+| `gotest/.env.example` | `AUTHENTIK_SCHEME`, `AUTHENTIK_HOST`, `AUTHENTIK_BOOTSTRAP_TOKEN`, `AUTHENTIK_USER_PASSWORD`, `AUTHENTIK_ORG1`/`AUTHENTIK_ORG2`, and the 4 per-user OAuth token keys |
+| `compose/.env.example` | `PG_*`, `AUTHENTIK_SECRET_KEY`, `AUTHENTIK_BOOTSTRAP_PASSWORD`/`AUTHENTIK_BOOTSTRAP_TOKEN`, `AUTHENTIK_TAG`, … |
 
-Password
-![](./docs/img/password.jpg "Password")
+`gotest/main.go` falls back to the same defaults documented in `.env.example`, so the POC runs **with or without** a `.env`. `make run` / `make e2e-compose` load these files automatically.
 
-Users
-![](./docs/img/users.jpg "Users")
+> [!IMPORTANT]
+> The shipped values are **demo credentials — rotate them for any real deployment.** The POC's `AUTHENTIK_BOOTSTRAP_TOKEN` must match the token of whatever Authentik you target (the compose `.env` or the committed k8s manifest). The defaults already match.
 
-User-Groups
-![](./docs/img/users-groups.jpg "User-Groups")
+## Deploying Authentik
 
-Groups
-![](./docs/img/groups.jpg "Groups")
+### Docker Compose (lightweight)
 
-Groups-User
-![](./docs/img/groups-users.jpg "Groups-User")
+```bash
+cd gotest
+make compose-up      # start PostgreSQL + Redis + server + worker, wait until ready
+make compose-logs    # follow logs
+make compose-down    # stop + remove volumes
+```
 
-Tokens
-![](./docs/img/tokens.jpg "Tokens")
+Authentik is served at `https://127.0.0.1:9443`.
 
-### Referenced
+### Kubernetes (KinD)
 
-[Authentik and Traefik](https://github.com/brokenscripts/authentik_traefik)
+Stands up a full KinD cluster with a `cloud-provider-kind` LoadBalancer and OSS PostgreSQL + Valkey datastores:
+
+```bash
+cd gotest
+make kind-up    # create cluster + deploy Authentik, expose via LoadBalancer
+make kind-down  # delete cluster, stop cloud-provider-kind, prune kindccm-* sidecars
+```
+
+`make kind-up` prints the assigned LoadBalancer IP; point the POC at it with `AUTHENTIK_HOST=<LB-IP>:443`.
+
+## Running the POC
+
+For each of `org-01` and `org-02` (an admin and a regular user), the POC:
+
+1. creates the group and the user (assigned to the group),
+2. sets the user's password and creates an OAuth API token,
+3. overwrites the token with a known key,
+4. re-authenticates **as that user** with the token and reads back its group membership.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant POC as POC (gotest/)
+    participant API as Authentik API (server)
+    participant DB as PostgreSQL
+
+    Note over POC,API: Repeated for org-01 and org-02, admin user and regular user
+    POC->>API: Authenticate with admin bootstrap token
+    API->>DB: Validate token
+    POC->>API: Create group
+    API->>DB: Persist group
+    POC->>API: Create user assigned to group
+    API->>DB: Persist user
+    POC->>API: Set user password
+    API->>DB: Store password hash
+    POC->>API: Create OAuth API token for user
+    API->>DB: Persist token
+    POC->>API: Retrieve Authentik-generated token key
+    API-->>POC: Return token key
+    POC->>API: Overwrite token key with known value
+    API->>DB: Update token key
+    Note over POC: Build new API client as that user (non-privileged token)
+    POC->>API: GET /core/users/me/ as the user
+    API->>DB: Read user + group membership
+    API-->>POC: User profile with group membership
+```
+
+```bash
+cd gotest
+make run                             # against a running Authentik (compose default: https://127.0.0.1:9443)
+
+make image-build && make image-run   # or containerized (distroless image, config via --env-file)
+```
+
+## End-to-end & tests
+
+E2E targets stand up a **real** Authentik, provision + verify, then tear everything down:
+
+```bash
+cd gotest
+make e2e-compose   # E2E against Authentik on Docker Compose (lightweight)
+make e2e           # E2E against Authentik on KinD (full cluster) == kind-up + test + kind-down
+```
+
+Unit + hermetic `httptest` contract tests require no infrastructure:
+
+```bash
+make test
+```
+
+## Development
+
+Run `make help` for the full list. Common targets:
+
+| Target | Description |
+|--------|-------------|
+| `make deps` | Install the pinned toolchain (Go + lint/vuln/kind/kubectl) via mise |
+| `make build` | Compile the POC binary into `bin/` |
+| `make run` | Run the POC against a running Authentik |
+| `make test` | Run unit + httptest contract tests |
+| `make lint` | Run golangci-lint + verify `go.mod`/`go.sum` are tidy |
+| `make lint-docker` | Lint the Dockerfile with hadolint |
+| `make vulncheck` | Scan dependencies with govulncheck |
+| `make static-check` | Composite gate: toolchain alignment + lint + hadolint + vulncheck |
+| `make image-build` / `make image-run` | Build / run the distroless container image |
+| `make compose-up` / `make compose-down` | Start / stop the Authentik Compose stack |
+| `make kind-up` / `make kind-down` | Create+deploy / destroy the KinD cluster |
+| `make e2e-compose` / `make e2e` | End-to-end against Compose / KinD |
+| `make renovate-validate` | Validate `renovate.json` |
+| `make ci` | Full local CI pipeline (`static-check` + `test` + `build`) |
+
+- **Toolchain** — pinned in `gotest/.mise.toml` (go 1.26.4, golangci-lint, govulncheck, hadolint, kind, kubectl); installed with `make deps`.
+- **Renovate** — `renovate.json` tracks every pinned version; validate with `make renovate-validate`.
+- **CI** — `.github/workflows/ci.yml` runs static-check + build + test. Reproduce locally with `make ci`.
+
+## Web UI
+
+Log in to the Authentik admin interface with `akadmin` / `Authentik01234567890!`.
+
+- **Docker Compose:** `https://localhost:9443/if/admin/`
+- **Kubernetes:** `https://<LB-IP>:443/if/admin/` (get the IP via `kubectl get svc authentik-server -o jsonpath='{.status.loadBalancer.ingress[0].ip}'`)
+
+| | |
+|---|---|
+| Login | ![Login](./docs/img/login.jpg) |
+| Password | ![Password](./docs/img/password.jpg) |
+| Users | ![Users](./docs/img/users.jpg) |
+| User Groups | ![User Groups](./docs/img/users-groups.jpg) |
+| Groups | ![Groups](./docs/img/groups.jpg) |
+| Group Users | ![Group Users](./docs/img/groups-users.jpg) |
+| Tokens | ![Tokens](./docs/img/tokens.jpg) |
+
+## Notes & caveats
+
+- **Demo credentials.** All shipped secrets in `.env.example` files are for demonstration only — rotate them before any real use.
+- **OSS datastores.** The Kubernetes PostgreSQL/Redis were swapped from the removed Bitnami images to OSS `postgres` + `valkey`.
+- **CockroachDB backend is experimental and non-working.** The `k8s/cockroachdb/` backend does not work: CockroachDB lacks the `pg_advisory_lock()` function that Authentik's Django migrations require.
+
+## References
+
+- [Authentik documentation](https://goauthentik.io/)
+- [goauthentik/client-go](https://github.com/goauthentik/client-go) — the Go client library the POC is built on
+- [Authentik and Traefik](https://github.com/brokenscripts/authentik_traefik)
