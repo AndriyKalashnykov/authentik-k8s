@@ -15,9 +15,9 @@ RUN go mod download
 COPY . .
 # CGO disabled → fully static binary for the distroless/static base.
 # Dependencies are pure Go (goauthentik client + go-openapi), so this is safe.
-RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/authentik-poc .
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/provisioner .
 
 FROM gcr.io/distroless/static-debian12:nonroot@sha256:d093aa3e30dbadd3efe1310db061a14da60299baff8450a17fe0ccc514a16639
-COPY --from=build /out/authentik-poc /usr/local/bin/authentik-poc
+COPY --from=build /out/provisioner /usr/local/bin/provisioner
 USER nonroot:nonroot
-ENTRYPOINT ["/usr/local/bin/authentik-poc"]
+ENTRYPOINT ["/usr/local/bin/provisioner"]

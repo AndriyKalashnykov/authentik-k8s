@@ -1,10 +1,10 @@
 .DEFAULT_GOAL := help
 
-APP_NAME := authentik-poc
+APP_NAME := provisioner
 GOFLAGS  ?= -mod=mod
 
 # --- Image ---
-IMAGE_REPO ?= authentik-poc
+IMAGE_REPO ?= provisioner
 IMAGE_TAG  ?= dev
 IMAGE      := $(IMAGE_REPO):$(IMAGE_TAG)
 

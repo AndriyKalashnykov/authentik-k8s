@@ -113,6 +113,12 @@
       "pinDigests": false
     },
     {
+      "description": "Do NOT digest-pin the golang BUILDER base. The digest folds onto `ARG GO_VERSION=1.26.4` (-> `1.26.4@sha256:...`), which breaks `make check-toolchain-alignment` (it awk-extracts the ARG and compares to go.mod's bare version) and would collide with the go-toolchain group's version bumps. The builder digest never reaches the distroless runtime image, so it adds no supply-chain value. The runtime base (distroless) keeps its digest pin.",
+      "matchManagers": ["dockerfile"],
+      "matchDepNames": ["golang"],
+      "pinDigests": false
+    },
+    {
       "description": "KIND_NODE_IMAGE already carries a digest; suppress standalone digest-refresh updates so they don't collide with and silently drop the version bump (which brings its own fresh digest).",
       "matchPackageNames": ["kindest/node"],
       "matchUpdateTypes": ["digest"],
