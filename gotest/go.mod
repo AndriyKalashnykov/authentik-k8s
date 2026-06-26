@@ -4,7 +4,7 @@ go 1.25.0
 
 require (
 	github.com/go-openapi/runtime v0.32.4
-	goauthentik.io/api/v3 v3.2024042.13
+	goauthentik.io/api/v3 v3.2026050.3
 )
 
 require (
