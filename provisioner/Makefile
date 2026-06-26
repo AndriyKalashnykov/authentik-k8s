@@ -26,6 +26,11 @@ CLOUD_PROVIDER_KIND_VERSION := 0.11.1
 # renovate: datasource=docker depName=kindest/node
 KIND_NODE_IMAGE := kindest/node:v1.36.1@sha256:3489c7674813ba5d8b1a9977baea8a6e553784dab7b84759d1014dbd78f7ebd5
 
+# mermaid-cli is a docker-only tool (no mise backend); pinned here, Renovate-tracked
+# via the Makefile customManager. Used by `mermaid-lint` to validate README diagrams.
+# renovate: datasource=docker depName=minlag/mermaid-cli
+MERMAID_CLI_VERSION := 11.15.0
+
 # Make recipes don't source shell rc files; put mise's shims dir on PATH so
 # every mise-managed tool (go, golangci-lint, govulncheck, hadolint, kind,
 # kubectl) resolves inside recipes.
@@ -94,8 +99,28 @@ lint-docker: deps
 vulncheck: deps
 	@govulncheck ./...
 
-#static-check: @ Composite quality gate (alignment + lint + hadolint + vulncheck)
-static-check: deps check-toolchain-alignment lint lint-docker vulncheck
+#mermaid-lint: @ Validate README/CLAUDE Mermaid diagrams render cleanly (minlag/mermaid-cli)
+mermaid-lint:
+	@command -v docker >/dev/null 2>&1 || { echo "ERROR: docker is required for mermaid-lint"; exit 1; }
+	@set -e; \
+	MD_FILES=$$(cd .. && grep -lF '```mermaid' README.md CLAUDE.md 2>/dev/null || true); \
+	if [ -z "$$MD_FILES" ]; then echo "No Mermaid blocks found — skipping."; exit 0; fi; \
+	IMAGE=minlag/mermaid-cli:$(MERMAID_CLI_VERSION); \
+	FAILED=0; \
+	for md in $$MD_FILES; do \
+		echo "Validating Mermaid blocks in $$md..."; \
+		if docker run --rm -v "$(PWD)/..:/data:ro" "$$IMAGE" \
+			-i "/data/$$md" -o "/tmp/$$(basename $$md .md).svg" >/tmp/mmlint.log 2>&1; then \
+			echo "  OK"; \
+		else \
+			echo "  PARSE ERROR in $$md:"; cat /tmp/mmlint.log; FAILED=1; \
+		fi; \
+	done; \
+	[ $$FAILED -eq 0 ] || { echo "mermaid-lint: FAILED"; exit 1; }
+	@echo "mermaid-lint: OK"
+
+#static-check: @ Composite quality gate (alignment + lint + hadolint + mermaid + vulncheck)
+static-check: deps check-toolchain-alignment lint lint-docker mermaid-lint vulncheck
 	@echo "Static check passed."
 
 #image-build: @ Build the POC container image
@@ -231,6 +256,6 @@ ci: static-check test build
 	@echo "Local CI pipeline passed."
 
 .PHONY: help deps deps-check check-toolchain-alignment build run test lint lint-docker \
-	vulncheck static-check image-build image-run update clean renovate-validate \
+	vulncheck mermaid-lint static-check image-build image-run update clean renovate-validate \
 	compose-up compose-down compose-logs e2e-compose deps-kind kind-create kind-deploy \
 	e2e kind-destroy kind-up kind-down ci
