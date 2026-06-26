@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/AndriyKalashnykov/authentik-k8s/gotest/internal/util"
+	"github.com/AndriyKalashnykov/authentik-k8s/provisioner/internal/util"
 	"goauthentik.io/api/v3"
 )
 

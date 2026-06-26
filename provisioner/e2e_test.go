@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/AndriyKalashnykov/authentik-k8s/gotest/internal/authentik"
+	"github.com/AndriyKalashnykov/authentik-k8s/provisioner/internal/authentik"
 	api "goauthentik.io/api/v3"
 )
 
