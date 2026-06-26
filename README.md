@@ -1,10 +1,10 @@
 [![CI](https://github.com/AndriyKalashnykov/authentik-k8s/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/AndriyKalashnykov/authentik-k8s/actions/workflows/ci.yml)
+[![Hits](https://hits.sh/github.com/AndriyKalashnykov/authentik-k8s.svg?view=today-total&style=plastic)](https://hits.sh/github.com/AndriyKalashnykov/authentik-k8s/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-brightgreen.svg)](https://opensource.org/licenses/MIT)
 [![Renovate enabled](https://img.shields.io/badge/renovate-enabled-brightgreen.svg)](https://renovatebot.com)
 [![Go](https://img.shields.io/github/go-mod/go-version/AndriyKalashnykov/authentik-k8s?filename=provisioner%2Fgo.mod)](https://github.com/AndriyKalashnykov/authentik-k8s/blob/main/provisioner/go.mod)
-[![Hits](https://hits.sh/github.com/AndriyKalashnykov/authentik-k8s.svg?view=today-total&style=plastic)](https://hits.sh/github.com/AndriyKalashnykov/authentik-k8s/)
 
-# authentik-k8s
+# Authentik Provisioning with the Go Client
 
 *Provision Authentik — groups, users, passwords, OAuth tokens — programmatically with the Go client. Deploy on Kubernetes (KinD) or Docker Compose.*
 
