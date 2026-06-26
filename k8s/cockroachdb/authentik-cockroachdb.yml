@@ -392,7 +392,7 @@ spec:
               mountPath: "/etc/threeport/db-create"
       containers:
         - name: authentik
-          image: "ghcr.io/goauthentik/server:2024.4"
+          image: "ghcr.io/goauthentik/server:2024.12"
           imagePullPolicy: "IfNotPresent"
           args: ["server"]
           env:            
@@ -511,7 +511,7 @@ spec:
                mountPath: "/etc/threeport/db-create"
       containers:
         - name: authentik
-          image: "ghcr.io/goauthentik/server:2024.4"
+          image: "ghcr.io/goauthentik/server:2024.12"
           imagePullPolicy: "IfNotPresent"
           args: ["worker"]
           env:            
