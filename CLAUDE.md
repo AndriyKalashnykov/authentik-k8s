@@ -24,15 +24,15 @@ The Go POC and the deployment are decoupled: you stand up Authentik first (compo
 - `k8s/kind-config.yaml` — single-node KinD cluster config used by `make e2e`.
 - `k8s/cockroachdb/` — experimental CockroachDB backend. **Known non-working**: CockroachDB lacks `pg_advisory_lock()`, which Authentik's Django migrations require (see README).
 - `compose/` — Docker Compose stack (Authentik server + worker + PostgreSQL + Redis). `compose/.env.example` is the committed source of truth; `compose/.env` is gitignored.
-- `scripts/` — `deploy-authentik-k8s.sh` (apply manifests, flip svc to LoadBalancer, wait, open browser) and `start-docker-compose-authentik.sh` (clean volumes, pull, up).
+- Deploy/teardown is driven by the `provisioner/` Makefile (`make -C provisioner kind-up`/`kind-down` for KinD, `compose-up`/`compose-down` for Docker Compose) — no standalone shell scripts.
 - `renovate.json` — tracks every pinned version (go.mod, `.mise.toml`, Dockerfile FROM/ARG, Makefile `_VERSION` constants, compose + k8s image tags, GitHub Action SHAs).
 
 ## Common commands
 
 ```bash
-# --- Deploy Authentik (pick one) ---
-./scripts/start-docker-compose-authentik.sh   # Docker Compose: server on https://localhost:9443
-./scripts/deploy-authentik-k8s.sh             # Kubernetes: applies k8s/postgresql/, opens LB IP
+# --- Deploy Authentik (pick one) — via the provisioner/ Makefile ---
+make -C provisioner compose-up   # Docker Compose: server on https://localhost:9443
+make -C provisioner kind-up      # Kubernetes: KinD + cloud-provider-kind, applies k8s/postgresql/
 
 # --- Go POC: toolchain via mise (provisioner/.mise.toml), targets in provisioner/Makefile ---
 cd provisioner
