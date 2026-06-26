@@ -1,4 +1,4 @@
-module github.com/AndriyKalashnykov/authentik-k8s/gotest
+module github.com/AndriyKalashnykov/authentik-k8s/provisioner
 
 go 1.26.4
 

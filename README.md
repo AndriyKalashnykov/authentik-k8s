@@ -1,7 +1,12 @@
-[![Hits](https://hits.sh/github.com/AndriyKalashnykov/authentik-k8s.svg?view=today-total&style=plastic)](https://hits.sh/github.com/AndriyKalashnykov/authentik-k8s/)
+[![CI](https://github.com/AndriyKalashnykov/authentik-k8s/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/AndriyKalashnykov/authentik-k8s/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-brightgreen.svg)](https://opensource.org/licenses/MIT)
+[![Renovate enabled](https://img.shields.io/badge/renovate-enabled-brightgreen.svg)](https://renovatebot.com)
+[![Go](https://img.shields.io/github/go-mod/go-version/AndriyKalashnykov/authentik-k8s?filename=provisioner%2Fgo.mod)](https://github.com/AndriyKalashnykov/authentik-k8s/blob/main/provisioner/go.mod)
+[![Hits](https://hits.sh/github.com/AndriyKalashnykov/authentik-k8s.svg?view=today-total&style=plastic)](https://hits.sh/github.com/AndriyKalashnykov/authentik-k8s/)
 
-# authentik-k8s — Authentik provisioning POC (Go client)
+# authentik-k8s
+
+*Provision Authentik — groups, users, passwords, OAuth tokens — programmatically with the Go client. Deploy on Kubernetes (KinD) or Docker Compose.*
 
 A proof-of-concept that drives [Authentik](https://goauthentik.io/) programmatically via its Go client library [`goauthentik.io/api/v3`](https://github.com/goauthentik/client-go) — creating groups, users, passwords and OAuth tokens, then re-authenticating as a created user to read its group membership. It ships with two ways to stand up Authentik (Docker Compose or KinD) plus the Go POC that runs against it.
 
@@ -10,11 +15,11 @@ A proof-of-concept that drives [Authentik](https://goauthentik.io/) programmatic
 The repo has two halves:
 
 - **Deploy Authentik** — locally via Docker Compose (lightweight) or on a full Kubernetes cluster via KinD (with `cloud-provider-kind` for LoadBalancer support and OSS PostgreSQL + Valkey datastores).
-- **The Go POC** (`gotest/`) — uses the Authentik Go client to provision a small demo org structure and verify it end-to-end against the running instance.
+- **The Go POC** (`provisioner/`) — uses the Authentik Go client to provision a small demo org structure and verify it end-to-end against the running instance.
 
 ```mermaid
 flowchart LR
-    POC["POC binary (gotest/)<br/>Go client goauthentik.io/api/v3"]
+    POC["POC binary (provisioner/)<br/>Go client goauthentik.io/api/v3"]
 
     subgraph AUTHENTIK["Authentik stack — run EITHER way"]
         direction TB
@@ -54,7 +59,7 @@ Everything is configured through environment variables — there are no hardcode
 The fastest happy path — start Authentik with Compose, then run the POC against it:
 
 ```bash
-cd gotest
+cd provisioner
 make deps          # one-time: install the toolchain (mise + Go/lint/kind/kubectl)
 make compose-up    # start Authentik (PostgreSQL + Redis + server + worker), wait until ready
 make run           # run the POC against https://127.0.0.1:9443
@@ -67,7 +72,7 @@ make compose-down  # tear it down (removes volumes)
 - Everything else (Go, golangci-lint, govulncheck, hadolint, kind, kubectl) is installed via [mise](https://mise.jdx.dev):
 
 ```bash
-cd gotest
+cd provisioner
 make deps   # installs mise (if missing) + the pinned toolchain from .mise.toml
 ```
 
@@ -76,16 +81,16 @@ make deps   # installs mise (if missing) + the pinned toolchain from .mise.toml
 All config is externalized to environment variables. Each consumer has a committed `.env.example` (source of truth) and a gitignored `.env` for your overrides:
 
 ```bash
-cp gotest/.env.example  gotest/.env     # POC config
+cp provisioner/.env.example  provisioner/.env     # POC config
 cp compose/.env.example compose/.env    # Compose stack config
 ```
 
 | File | Key variables |
 |------|---------------|
-| `gotest/.env.example` | `AUTHENTIK_SCHEME`, `AUTHENTIK_HOST`, `AUTHENTIK_BOOTSTRAP_TOKEN`, `AUTHENTIK_USER_PASSWORD`, `AUTHENTIK_ORG1`/`AUTHENTIK_ORG2`, and the 4 per-user OAuth token keys |
+| `provisioner/.env.example` | `AUTHENTIK_SCHEME`, `AUTHENTIK_HOST`, `AUTHENTIK_BOOTSTRAP_TOKEN`, `AUTHENTIK_USER_PASSWORD`, `AUTHENTIK_ORG1`/`AUTHENTIK_ORG2`, and the 4 per-user OAuth token keys |
 | `compose/.env.example` | `PG_*`, `AUTHENTIK_SECRET_KEY`, `AUTHENTIK_BOOTSTRAP_PASSWORD`/`AUTHENTIK_BOOTSTRAP_TOKEN`, `AUTHENTIK_TAG`, … |
 
-`gotest/main.go` falls back to the same defaults documented in `.env.example`, so the POC runs **with or without** a `.env`. `make run` / `make e2e-compose` load these files automatically.
+`provisioner/main.go` falls back to the same defaults documented in `.env.example`, so the POC runs **with or without** a `.env`. `make run` / `make e2e-compose` load these files automatically.
 
 > [!IMPORTANT]
 > The shipped values are **demo credentials — rotate them for any real deployment.** The POC's `AUTHENTIK_BOOTSTRAP_TOKEN` must match the token of whatever Authentik you target (the compose `.env` or the committed k8s manifest). The defaults already match.
@@ -95,7 +100,7 @@ cp compose/.env.example compose/.env    # Compose stack config
 ### Docker Compose (lightweight)
 
 ```bash
-cd gotest
+cd provisioner
 make compose-up      # start PostgreSQL + Redis + server + worker, wait until ready
 make compose-logs    # follow logs
 make compose-down    # stop + remove volumes
@@ -108,7 +113,7 @@ Authentik is served at `https://127.0.0.1:9443`.
 Stands up a full KinD cluster with a `cloud-provider-kind` LoadBalancer and OSS PostgreSQL + Valkey datastores:
 
 ```bash
-cd gotest
+cd provisioner
 make kind-up    # create cluster + deploy Authentik, expose via LoadBalancer
 make kind-down  # delete cluster, stop cloud-provider-kind, prune kindccm-* sidecars
 ```
@@ -127,7 +132,7 @@ For each of `org-01` and `org-02` (an admin and a regular user), the POC:
 ```mermaid
 sequenceDiagram
     autonumber
-    participant POC as POC (gotest/)
+    participant POC as POC (provisioner/)
     participant API as Authentik API (server)
     participant DB as PostgreSQL
 
@@ -153,7 +158,7 @@ sequenceDiagram
 ```
 
 ```bash
-cd gotest
+cd provisioner
 make run                             # against a running Authentik (compose default: https://127.0.0.1:9443)
 
 make image-build && make image-run   # or containerized (distroless image, config via --env-file)
@@ -164,7 +169,7 @@ make image-build && make image-run   # or containerized (distroless image, confi
 E2E targets stand up a **real** Authentik, provision + verify, then tear everything down:
 
 ```bash
-cd gotest
+cd provisioner
 make e2e-compose   # E2E against Authentik on Docker Compose (lightweight)
 make e2e           # E2E against Authentik on KinD (full cluster) == kind-up + test + kind-down
 ```
@@ -196,7 +201,7 @@ Run `make help` for the full list. Common targets:
 | `make renovate-validate` | Validate `renovate.json` |
 | `make ci` | Full local CI pipeline (`static-check` + `test` + `build`) |
 
-- **Toolchain** — pinned in `gotest/.mise.toml` (go 1.26.4, golangci-lint, govulncheck, hadolint, kind, kubectl); installed with `make deps`.
+- **Toolchain** — pinned in `provisioner/.mise.toml` (go 1.26.4, golangci-lint, govulncheck, hadolint, kind, kubectl); installed with `make deps`.
 - **Renovate** — `renovate.json` tracks every pinned version; validate with `make renovate-validate`.
 - **CI** — `.github/workflows/ci.yml` runs static-check + build + test. Reproduce locally with `make ci`.
 

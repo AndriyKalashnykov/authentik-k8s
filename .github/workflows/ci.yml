@@ -14,10 +14,10 @@ permissions:
   contents: read
   pull-requests: read   # dorny/paths-filter listFiles() on pull_request events
 
-# The Go project (go.mod, Makefile, .mise.toml) lives in gotest/. Jobs that
-# run `make` set working-directory: gotest at JOB level (not workflow level —
-# ci-pass has no checkout, so a workflow-wide gotest default would break it).
-# mise-action reads gotest/.mise.toml via its own working_directory input.
+# The Go project (go.mod, Makefile, .mise.toml) lives in provisioner/. Jobs that
+# run `make` set working-directory: provisioner at JOB level (not workflow level —
+# ci-pass has no checkout, so a workflow-wide provisioner default would break it).
+# mise-action reads provisioner/.mise.toml via its own working_directory input.
 
 jobs:
   # Cheap path detector: only Go-project or workflow changes run CI.
@@ -36,7 +36,7 @@ jobs:
         with:
           filters: |
             code:
-              - 'gotest/**'
+              - 'provisioner/**'
               - '.github/workflows/**'
               - 'CLAUDE.md'
 
@@ -47,14 +47,14 @@ jobs:
     timeout-minutes: 10
     defaults:
       run:
-        working-directory: gotest
+        working-directory: provisioner
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
         with:
           install: true
           cache: true
-          working_directory: gotest
+          working_directory: provisioner
       - name: Static check
         run: make static-check
 
@@ -65,14 +65,14 @@ jobs:
     timeout-minutes: 10
     defaults:
       run:
-        working-directory: gotest
+        working-directory: provisioner
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
         with:
           install: true
           cache: true
-          working_directory: gotest
+          working_directory: provisioner
       - name: Build
         run: make build
 
@@ -83,14 +83,14 @@ jobs:
     timeout-minutes: 10
     defaults:
       run:
-        working-directory: gotest
+        working-directory: provisioner
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
         with:
           install: true
           cache: true
-          working_directory: gotest
+          working_directory: provisioner
       - name: Test
         run: make test
 
