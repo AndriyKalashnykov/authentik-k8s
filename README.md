@@ -227,6 +227,7 @@ Log in to the Authentik admin interface with `akadmin` / `Authentik01234567890!`
 - **Demo credentials.** All shipped secrets in `.env.example` files are for demonstration only — rotate them before any real use.
 - **OSS datastores.** The Kubernetes PostgreSQL/Redis were swapped from the removed Bitnami images to OSS `postgres` + `valkey`.
 - **CockroachDB backend is experimental and non-working.** The `k8s/cockroachdb/` backend does not work: CockroachDB lacks the `pg_advisory_lock()` function that Authentik's Django migrations require.
+- **YugabyteDB backend is experimental and non-working — for a different reason.** The `k8s/yugabytedb/` backend (single-node YugabyteDB 2025.1) *does* provide `pg_advisory_lock()` (the CockroachDB blocker is gone, verified), but Authentik 2026.5's Django migrations still abort partway on YugabyteDB transaction-conflict errors (`YB001`), even with READ COMMITTED isolation enabled. See [`docs/spikes/authentik-cockroachdb-yugabytedb.md`](docs/spikes/authentik-cockroachdb-yugabytedb.md) for the full POC analysis. **PostgreSQL remains the only supported datastore.**
 
 ## References
 

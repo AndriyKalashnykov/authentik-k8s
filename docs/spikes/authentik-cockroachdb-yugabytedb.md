@@ -16,7 +16,7 @@
 | Database | Verdict on Authentik 2026.5 |
 |----------|------------------------------|
 | **CockroachDB** | **Still blocked.** Session-scoped `pg_advisory_lock()` — the exact function Authentik's migrations need — is **not yet implemented**. CockroachDB added *transaction-level* advisory locks in early 2026, but the *session-scoped* builtins are tracked by an issue opened **2026-05-08** that is still **open with no milestone** ([cockroachdb#169981](https://github.com/cockroachdb/cockroach/issues/169981)). Authentik also has no flag to disable advisory locks ([authentik#14562](https://github.com/goauthentik/authentik/issues/14562), open, unanswered). |
-| **YugabyteDB** | **Plausibly feasible, but unvalidated for Authentik.** YugabyteDB's advisory-lock blocker is **removed**: advisory locks are GA and **enabled by default since v2025.1**, which is also the release that rebased YSQL onto **PostgreSQL 15** (inside Authentik's supported 14–18 range). No known end-to-end report of Authentik running on YugabyteDB exists, and YugabyteDB has separate Django-migration/DDL caveats, so this is a *candidate worth a spike*, not a confirmed-working path. |
+| **YugabyteDB** | **Original blocker FIXED, but Authentik still does not install — VALIDATED on KinD (see §6a).** Advisory locks are GA + default-on since v2025.1 and YSQL is PostgreSQL 15 (in range), so the *advisory-lock* blocker the user hit is genuinely gone (`pg_try_advisory_lock()` → true; Authentik's migration lock acquires/releases). **But** a POC on YugabyteDB 2025.1.4.0 + Authentik 2026.5 showed the Django migrations **abort partway** with YugabyteDB transaction-conflict errors (`YB001 "transaction expired or aborted"`), **even with `yb_enable_read_committed_isolation=true`**. So: the *old* issue is fixed, a *different*, deeper DDL/migration-transaction incompatibility now blocks a clean install. |
 
 Bottom line: **CockroachDB is still a no.** **YugabyteDB is the one that changed** — the specific
 issue that broke it before is fixed upstream, making a fresh POC attempt reasonable (but it must be
@@ -169,12 +169,38 @@ A YugabyteDB attempt would mirror the existing `k8s/cockroachdb/` structure. Ske
 Verification gate: the spike is "done = works" only when the migration job completes **and** `make
 e2e` passes against YugabyteDB — not merely when advisory locks resolve.
 
+### 6a. POC validation results (executed 2026-06-26 on KinD)
+
+The POC outline above was **built and run** — `k8s/yugabytedb/authentik-yugabytedb.yml` (single-node
+`yugabytedb/yugabyte:2025.1.4.0-b103`, YSQL on 5433, `ysql_enable_auth=true`) deployed on KinD with
+Authentik 2026.5's server/worker/valkey pointed at it via the `authentik` Secret. Findings, in order:
+
+| Step | Result |
+|------|--------|
+| YugabyteDB starts, YSQL ready | ✅ `PostgreSQL 15.12-YB-2025.1.4.0` |
+| Advisory locks (direct) | ✅ `SELECT pg_try_advisory_lock(42)` → `t`; `pg_advisory_unlock(42)` → `t` |
+| Advisory locks (Authentik's migration lock) | ✅ log shows `waiting to acquire database lock` → `releasing database lock` |
+| `rowcount` semantics (a suspected divergence) | ✅ identical to PostgreSQL — a 0-row `SELECT` returns `rowcount=0` (ruled out as a cause) |
+| **Django migrations complete** | ❌ **abort ~35–40 migrations in** (around `authentik_blueprints.0001_initial`) with `psycopg.errors.SerializationFailure` / `OperationalError: current transaction is expired or aborted ... conflict: YB001` |
+| With `yb_enable_read_committed_isolation=true` | ❌ still aborts — error changes from `[repeatable read]` to `[read committed]` and reports *"query layer retry isn't possible … some data was already sent to the user"* |
+
+**Conclusion:** the advisory-lock blocker (the user's original issue) is **genuinely resolved**, but
+Authentik 2026.5 **does not install cleanly on YugabyteDB 2025.1.4.0** — its Django migration
+transactions hit YugabyteDB transaction-conflict aborts (YB001) that even READ COMMITTED can't retry
+once the transaction has returned rows. A secondary symptom: a half-migrated schema (django_migrations
+populated, `authentik_core_group` absent) then wedges restarts on the `to_2025_12_group_duplicate.py`
+system migration with `UndefinedTable`. Getting the full migration suite to pass would need deeper
+YugabyteDB transaction tuning and/or app-side accommodations that Authentik does not officially
+support (PostgreSQL is its only supported backend). The manifest is kept as an **experimental,
+documented-non-working** backend (mirroring `k8s/cockroachdb/`), useful for advancing the
+investigation when a newer YugabyteDB / Authentik lands.
+
 ## 7. Recommendation for this repo
 
 | Action | Recommendation |
 |--------|----------------|
 | `k8s/cockroachdb/` | **Keep frozen as-is** (or document-and-archive). It remains non-working and the upstream fix is open/unmilestoned. Renovate already ignores `k8s/cockroachdb/**`, which is correct — there is no point bumping `cockroach:v22.2.19` toward a release that still lacks session-scoped locks. Optionally add a one-line pointer in that dir's notes to [cockroachdb#169981](https://github.com/cockroachdb/cockroach/issues/169981) so a future revisit has the tracking issue. Revisit **only** when #169981 closes (a future 26.x). |
-| YugabyteDB | **Worth a fresh, isolated POC** (`k8s/yugabytedb/`, v2025.1+) — this is the database whose blocker actually changed. Treat it as experimental until `make e2e` is green; do not present it as supported on the strength of upstream docs alone. If the spike succeeds, it is a more credible "alternative distributed datastore" story than CockroachDB. |
+| YugabyteDB | **POC built + run (`k8s/yugabytedb/`); keep as experimental/non-working.** §6a confirmed the advisory-lock blocker is fixed but Authentik's migrations still abort on YB001 transaction conflicts. Like `k8s/cockroachdb/`, the manifest is frozen + Renovate-ignored; revisit when a newer YugabyteDB (better DDL-transaction handling) or an Authentik release tolerant of YugabyteDB's transaction model lands. Do **not** present YugabyteDB as supported. |
 | Default datastore | **No change.** PostgreSQL (`postgres:18-alpine`) stays the production-working backend; neither alternative displaces it. |
 
 ## 8. References
