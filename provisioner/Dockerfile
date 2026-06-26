@@ -1,4 +1,4 @@
-# syntax=docker/dockerfile:1
+# syntax=docker/dockerfile:1@sha256:87999aa3d42bdc6bea60565083ee17e86d1f3339802f543c0d03998580f9cb89
 
 # Build a static binary, ship it on distroless-nonroot. This is a one-shot job
 # (creates groups/users/tokens then exits), so there is no EXPOSE/HEALTHCHECK —
@@ -17,7 +17,7 @@ COPY . .
 # Dependencies are pure Go (goauthentik client + go-openapi), so this is safe.
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/authentik-poc .
 
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:d093aa3e30dbadd3efe1310db061a14da60299baff8450a17fe0ccc514a16639
 COPY --from=build /out/authentik-poc /usr/local/bin/authentik-poc
 USER nonroot:nonroot
 ENTRYPOINT ["/usr/local/bin/authentik-poc"]

@@ -3,7 +3,7 @@ version: '3.4'
 
 services:
   postgresql:
-    image: docker.io/library/postgres:18-alpine
+    image: docker.io/library/postgres:18-alpine@sha256:1b1689b20d16a014a3d195653381cf2caa75a41a92d93b255a9d6ea29fd353aa
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -d $${POSTGRES_DB} -U $${POSTGRES_USER}"]
@@ -25,7 +25,7 @@ services:
     ports:
       - "0.0.0.0:${PG_PORT_HTTP:-5432}:5432"
   redis:
-    image: docker.io/library/redis:alpine
+    image: docker.io/library/redis:alpine@sha256:9d317178eceac8454a2284a9e6df2466b93c745529947f0cd42a0fa9609d7005
     command: --save 60 1 --loglevel warning
     restart: unless-stopped
     healthcheck:
