@@ -11,3 +11,6 @@ go = "1.26.4"
 # container (see Makefile CLOUD_PROVIDER_KIND_VERSION), not a mise tool.
 "aqua:kubernetes-sigs/kind" = "0.32.0"
 "aqua:kubernetes/kubectl" = "1.36.2"
+# Security gates (static-check): filesystem CVE/secret/misconfig scan + secret scan.
+"aqua:aquasecurity/trivy" = "0.71.2"
+"aqua:gitleaks/gitleaks" = "8.30.1"

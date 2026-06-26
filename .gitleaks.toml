@@ -1,0 +1,26 @@
+# gitleaks config for the `secrets` Make target (scans the CURRENT working tree:
+# `gitleaks detect --no-git`). This repo is a POC whose .env.example / k8s
+# manifests / main.go fallback consts intentionally ship DEMO credentials
+# (documented as "rotate for real use"). They are allowlisted below so the gate
+# still catches a REAL accidental leak anywhere else (code, scripts, compose).
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Intentional committed demo credentials (rotate for real deployments)"
+# Whole-file demo-credential sources:
+#  - .env / .env.example: the committed config source-of-truth + local overrides
+#  - k8s/**.y(a)ml: Helm-generated Authentik manifests; the only 'secrets' are the
+#    demo `authentik` Secret and base64 of non-secrets (service names, db names)
+paths = [
+    '''(^|/)\.env(\.example)?$''',
+    '''^k8s/.+\.ya?ml$''',
+]
+# main.go ships the same demo tokens as fallback defaults (mirroring .env.example);
+# allowlist the exact values so the rest of the Go code is still scanned.
+regexes = [
+    '''NoMlxBQuYgfu3j19ygGqhjXenAjrJgOfN5naqmSDBUhdLjYqHKze7yyzY07H''',
+    '''ZId4CDEtmHbnuxkJH2ehUzHgYeTmOansuCO0JsTTsZnYB1z9N0WoAutpyH4i''',
+    '''e3qVF1uGTL5DKjglvMKpDYk60X7s89jnbNh9nPEpFYzSgoOHYDSMi0xxYhYr''',
+    '''svkH90FMYlnXPA5JHxePVQkozTjXReT6rsdQ2BXedwI5mtrFYR5mfrunMt4B''',
+]

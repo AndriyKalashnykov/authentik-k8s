@@ -21,7 +21,7 @@ permissions:
 
 jobs:
   # Cheap path detector: only Go-project or workflow changes run CI.
-  # Doc / k8s / compose / scripts changes skip the heavy jobs (positive
+  # Doc / k8s / compose changes skip the heavy jobs (positive
   # allow-list — the code paths here are enumerable). CLAUDE.md is project
   # config, not docs, so it counts as code.
   changes:
@@ -94,9 +94,29 @@ jobs:
       - name: Test
         run: make test
 
+  # Live e2e: stand up Authentik via Docker Compose, provision + verify with the
+  # Go POC, tear down. No secrets needed (demo bootstrap token from .env.example).
+  e2e:
+    needs: [changes, build, test]
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: provisioner
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+        with:
+          install: true
+          cache: true
+          working_directory: provisioner
+      - name: E2E (Authentik via Docker Compose)
+        run: make e2e-compose
+
   ci-pass:
     if: always()
-    needs: [changes, static-check, build, test]
+    needs: [changes, static-check, build, test, e2e]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:

@@ -25,7 +25,7 @@ services:
     ports:
       - "0.0.0.0:${PG_PORT_HTTP:-5432}:5432"
   redis:
-    image: docker.io/library/redis:alpine@sha256:9d317178eceac8454a2284a9e6df2466b93c745529947f0cd42a0fa9609d7005
+    image: docker.io/library/redis:8-alpine@sha256:9d317178eceac8454a2284a9e6df2466b93c745529947f0cd42a0fa9609d7005
     command: --save 60 1 --loglevel warning
     restart: unless-stopped
     healthcheck:
