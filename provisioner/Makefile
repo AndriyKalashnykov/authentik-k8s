@@ -99,6 +99,14 @@ lint-docker: deps
 vulncheck: deps
 	@govulncheck ./...
 
+#trivy-fs: @ Filesystem CVE scan of dependencies (HIGH/CRITICAL, fixed-only)
+trivy-fs: deps
+	@trivy fs --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --no-progress --quiet ..
+
+#secrets: @ Scan the working tree for leaked secrets (gitleaks; demo creds allowlisted in .gitleaks.toml)
+secrets: deps
+	@cd .. && gitleaks detect --no-git --source . -c .gitleaks.toml --redact --no-banner
+
 #mermaid-lint: @ Validate README/CLAUDE Mermaid diagrams render cleanly (minlag/mermaid-cli)
 mermaid-lint:
 	@command -v docker >/dev/null 2>&1 || { echo "ERROR: docker is required for mermaid-lint"; exit 1; }
@@ -119,8 +127,8 @@ mermaid-lint:
 	[ $$FAILED -eq 0 ] || { echo "mermaid-lint: FAILED"; exit 1; }
 	@echo "mermaid-lint: OK"
 
-#static-check: @ Composite quality gate (alignment + lint + hadolint + mermaid + vulncheck)
-static-check: deps check-toolchain-alignment lint lint-docker mermaid-lint vulncheck
+#static-check: @ Composite quality gate (alignment + lint + hadolint + mermaid + vulncheck + trivy-fs + secrets)
+static-check: deps check-toolchain-alignment lint lint-docker mermaid-lint vulncheck trivy-fs secrets
 	@echo "Static check passed."
 
 #image-build: @ Build the POC container image
@@ -256,6 +264,6 @@ ci: static-check test build
 	@echo "Local CI pipeline passed."
 
 .PHONY: help deps deps-check check-toolchain-alignment build run test lint lint-docker \
-	vulncheck mermaid-lint static-check image-build image-run update clean renovate-validate \
+	vulncheck mermaid-lint trivy-fs secrets static-check image-build image-run update clean renovate-validate \
 	compose-up compose-down compose-logs e2e-compose deps-kind kind-create kind-deploy \
 	e2e kind-destroy kind-up kind-down ci
