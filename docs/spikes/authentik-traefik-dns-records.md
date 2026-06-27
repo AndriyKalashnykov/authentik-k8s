@@ -193,7 +193,7 @@ func BindAppToEmbeddedOutpost(ctx context.Context, apiClient *api.APIClient, pro
 **Config additions** (`provisioner/.env.example` — the committed source of truth, per the repo's
 parameter-externalization rule; no hardcoded hosts/domains):
 
-```
+```bash
 AUTHENTIK_FORWARD_AUTH_ENABLED=false          # opt-in; default off so existing POC behavior is unchanged
 AUTHENTIK_COOKIE_DOMAIN=domain.tld
 AUTHENTIK_FORWARD_AUTH_EXTERNAL_HOST=https://authentik.domain.tld
