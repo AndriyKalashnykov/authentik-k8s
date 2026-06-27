@@ -181,7 +181,7 @@ renovate-validate:
 # Authentik via Docker Compose (lightweight local alternative to KinD)
 # ---------------------------------------------------------------------------
 
-#compose-up: @ Start Authentik (PostgreSQL+Redis+server+worker) via Compose and wait until ready
+#compose-up: @ Start Authentik (PostgreSQL+server+worker) via Compose and wait until ready
 compose-up:
 	@[ -f $(COMPOSE_DIR)/.env ] || cp $(COMPOSE_DIR)/.env.example $(COMPOSE_DIR)/.env
 	@$(COMPOSE) up -d
