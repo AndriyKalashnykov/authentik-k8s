@@ -97,6 +97,27 @@ jobs:
       - name: Test
         run: make test
 
+  # Build the provisioner image and scan it (Trivy HIGH/CRITICAL). No push — the
+  # POC has no registry; this just proves the image builds and is CVE-clean
+  # (hadolint in static-check only lints the Dockerfile, it never builds it).
+  docker:
+    needs: [changes, static-check]
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: provisioner
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+        with:
+          install: true
+          cache: true
+          working_directory: provisioner
+      - name: Build + scan image
+        run: make image-scan
+
   # Live e2e: stand up Authentik via Docker Compose, provision + verify with the
   # Go POC, tear down. No secrets needed (demo bootstrap token from .env.example).
   e2e:
@@ -119,7 +140,7 @@ jobs:
 
   ci-pass:
     if: always()
-    needs: [changes, static-check, build, test, e2e]
+    needs: [changes, static-check, build, test, docker, e2e]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:

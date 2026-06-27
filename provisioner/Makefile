@@ -153,6 +153,11 @@ image-run: image-build
 	@ENVFILE=$$([ -f .env ] && echo .env || echo .env.example); \
 	 docker run --rm --env-file "$$ENVFILE" $(IMAGE)
 
+#image-scan: @ Build the image and scan it for HIGH/CRITICAL CVEs (Trivy; what CI's docker job runs)
+image-scan: image-build
+	@trivy image --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --no-progress --quiet $(IMAGE)
+	@echo "image-scan: OK"
+
 #update: @ Update dependencies to latest versions
 update: deps
 	@export GOFLAGS=$(GOFLAGS); go get -u ./... && go mod tidy
@@ -277,6 +282,6 @@ ci: static-check test build
 	@echo "Local CI pipeline passed."
 
 .PHONY: help deps deps-check check-toolchain-alignment build run test lint lint-docker \
-	vulncheck mermaid-lint compose-lint trivy-fs secrets static-check image-build image-run update clean renovate-validate \
+	vulncheck mermaid-lint compose-lint trivy-fs secrets static-check image-build image-run image-scan update clean renovate-validate \
 	compose-up compose-down compose-logs e2e-compose deps-kind kind-create kind-deploy \
 	e2e kind-destroy kind-up kind-down ci
