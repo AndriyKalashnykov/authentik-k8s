@@ -23,7 +23,7 @@
   "automerge": false,
   "postUpdateOptions": ["gomodTidy"],
   "kubernetes": {
-    "managerFilePatterns": ["/k8s/.+\\.ya?ml$/"]
+    "managerFilePatterns": ["/k8s/postgresql/oss-datastores\\.yml$/"]
   },
   "customManagers": [
     {
@@ -120,10 +120,10 @@
       "enabled": false
     },
     {
-      "description": "Group the Authentik server image across the k8s manifest (kubernetes manager) and compose .env (custom.regex). Both pin the rolling `2026.5` tag; pinDigests:false keeps them symmetric (the env tag cannot carry a digest) so dedup doesn't drop one side.",
-      "matchManagers": ["kubernetes", "custom.regex"],
-      "matchPackageNames": ["ghcr.io/goauthentik/server"],
-      "groupName": "Authentik server",
+      "description": "Group the Authentik upgrade into one PR: the compose .env image tag (ghcr.io/goauthentik/server, docker) and the Helm chart pin that drives the k8s manifest (authentik, helm via AUTHENTIK_CHART_VERSION) — both custom.regex. A chart bump regenerates the k8s manifest (the k8s-drift gate enforces `make k8s-generate`); pinDigests:false because the env tag cannot carry a digest. (The k8s manifest's image is NOT tracked directly — it's generated from the chart pin; see the kubernetes manager scope above.)",
+      "matchManagers": ["custom.regex"],
+      "matchPackageNames": ["ghcr.io/goauthentik/server", "authentik"],
+      "groupName": "Authentik",
       "pinDigests": false
     }
   ]
