@@ -11,7 +11,7 @@ client the core POC uses for users/groups/tokens.
 
 | File | Purpose |
 |------|---------|
-| `docker-compose.forward-auth.yml` | Overlay adding `traefik` (`traefik:v3.7.5`) + `whoami` (`traefik/whoami:v1.11.0`) to the base `authentik` Compose project. |
+| `docker-compose.forward-auth.yml` | Overlay adding `traefik` + `whoami` (`traefik/whoami`) to the base `authentik` Compose project. Image tags are pinned (and Renovate-tracked) in that file — the single source of truth. |
 | `traefik/dynamic.yml` | Traefik dynamic config: the `authentik` forwardAuth middleware + a router proxying the `/outpost.goauthentik.io/` handshake paths back to the Authentik server. |
 
 ## Run it
