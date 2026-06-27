@@ -207,20 +207,10 @@ Run `make help` for the full list. Common targets:
 
 ## Web UI
 
-Log in to the Authentik admin interface with `akadmin` / `Authentik01234567890!`.
-
-- **Docker Compose:** `https://localhost:9443/if/admin/`
-- **Kubernetes:** `https://<LB-IP>:443/if/admin/` (get the IP via `kubectl get svc authentik-server -o jsonpath='{.status.loadBalancer.ingress[0].ip}'`)
-
-| | |
-|---|---|
-| Login | ![Login](./docs/img/login.jpg) |
-| Password | ![Password](./docs/img/password.jpg) |
-| Users | ![Users](./docs/img/users.jpg) |
-| User Groups | ![User Groups](./docs/img/users-groups.jpg) |
-| Groups | ![Groups](./docs/img/groups.jpg) |
-| Group Users | ![Group Users](./docs/img/groups-users.jpg) |
-| Tokens | ![Tokens](./docs/img/tokens.jpg) |
+Log in to the Authentik admin interface with `akadmin` / `Authentik01234567890!`
+(Compose: `https://localhost:9443/if/admin/`). See [docs/web-ui.md](docs/web-ui.md)
+for annotated screenshots of the provisioned users, groups, and tokens, plus how
+to regenerate them.
 
 ## Notes & caveats
 
