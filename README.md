@@ -6,16 +6,16 @@
 
 # Authentik Provisioning with the Go Client
 
-*Provision Authentik — groups, users, passwords, OAuth tokens — programmatically with the Go client. Deploy on Kubernetes (KinD) or Docker Compose.*
+*Provision Authentik — groups, users, passwords, OAuth tokens, and forward-auth application access — programmatically with the Go client. Deploy on Kubernetes (KinD) or Docker Compose.*
 
-A proof-of-concept that drives [Authentik](https://goauthentik.io/) programmatically via its Go client library [`goauthentik.io/api/v3`](https://github.com/goauthentik/client-go) — creating groups, users, passwords and OAuth tokens, then re-authenticating as a created user to read its group membership. It ships with two ways to stand up Authentik (Docker Compose or KinD) plus the Go POC that runs against it.
+A proof-of-concept that drives [Authentik](https://goauthentik.io/) programmatically via its Go client library [`goauthentik.io/api/v3`](https://github.com/goauthentik/client-go). The core flow creates groups, users, passwords and OAuth tokens, then re-authenticates as a created user to read its group membership. An optional second demo extends the same client from provisioning identities to controlling **application access** — it configures an Authentik proxy provider, application, and embedded-outpost binding so that [Traefik](https://traefik.io/)'s `forwardAuth` middleware gates a sample app behind Authentik login. It ships with two ways to stand up Authentik (Docker Compose or KinD) plus the Go POC that runs against it.
 
 ## Overview
 
 The repo has two halves:
 
 - **Deploy Authentik** — locally via Docker Compose (lightweight) or on a full Kubernetes cluster via KinD (with `cloud-provider-kind` for LoadBalancer support and OSS PostgreSQL datastore).
-- **`provisioner/`** — a Go program that provisions a demo org structure (groups, users, tokens) and verifies it end-to-end via the Authentik client.
+- **`provisioner/`** — a Go program that provisions a demo org structure (groups, users, tokens) and verifies it end-to-end via the Authentik client, and (optionally) configures a Traefik forward-auth provider + application so Authentik gates a sample app — see [Forward-auth demo](#forward-auth-demo-traefik--whoami).
 
 ```mermaid
 flowchart LR
@@ -202,6 +202,58 @@ Unit + hermetic `httptest` contract tests require no infrastructure:
 make test
 ```
 
+## Forward-auth demo (Traefik + whoami)
+
+An optional second demo shows the same Go client configuring **application
+access**, not just users: it creates an Authentik [proxy provider](https://docs.goauthentik.io/docs/add-secure-apps/providers/proxy/)
+(forward-auth) + application and binds them to the built-in **embedded outpost**,
+then [Traefik](https://traefik.io/)'s `forwardAuth` middleware gates a
+[`traefik/whoami`](https://github.com/traefik/whoami) app behind Authentik login.
+
+```bash
+cd provisioner
+make compose-forward-auth-up     # Authentik + Traefik + whoami, then configure forward-auth
+# browse https://whoami.127-0-0-1.sslip.io (accept the self-signed cert):
+#   -> redirected to the Authentik login (akadmin / the bootstrap password)
+#   -> after login, whoami echoes the X-authentik-* identity headers
+make compose-forward-auth-down   # tear it down (removes volumes)
+
+make e2e-forward-auth            # automated: up -> configure -> assert unauth -> 302 -> down
+```
+
+The provisioner wiring is opt-in via `AUTHENTIK_FORWARD_AUTH_ENABLED=true` (off by
+default, so the core POC stays a pure user/group/token demo). A second gate,
+`AUTHENTIK_PROVISION_ORGS` (default `true`), skips the non-idempotent org/user/token
+provisioning so the idempotent forward-auth setup can run on its own against an
+existing instance — `make compose-forward-auth-up` sets both gates for you. The
+`127-0-0-1.sslip.io` wildcard host resolves `*.127-0-0-1.sslip.io` → `127.0.0.1`
+with no `/etc/hosts` edits. Flow PKs are resolved at runtime from their slugs
+(`default-provider-authorization-implicit-consent`, `default-provider-invalidation-flow`)
+— never hardcoded — and the whole setup is idempotent. The Traefik dashboard is
+served at `http://127.0.0.1:8081` (`TRAEFIK_DASHBOARD_PORT` in `compose/.env.example`).
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant B as Browser
+    participant T as Traefik
+    participant O as Authentik embedded outpost
+    participant W as traefik/whoami
+
+    Note over O: Provisioner pre-creates the proxy provider + application,<br/>bound to the embedded outpost
+    B->>T: GET https://whoami.127-0-0-1.sslip.io
+    T->>O: forwardAuth: /outpost.goauthentik.io/auth/traefik
+    O-->>T: 302 (no session)
+    T-->>B: 302 redirect to Authentik login
+    B->>O: Log in (akadmin)
+    O-->>B: Session cookie set
+    B->>T: GET whoami (with cookie)
+    T->>O: forwardAuth re-check
+    O-->>T: 200 + X-authentik-* identity headers
+    T->>W: Proxy request + identity headers
+    W-->>B: Echo headers (authenticated)
+```
+
 ## Development
 
 Run `make help` for the full list. Common targets:
@@ -220,6 +272,8 @@ Run `make help` for the full list. Common targets:
 | `make image-build` / `make image-run` | Build / run the distroless container image |
 | `make image-scan` | Build the image and scan it for HIGH/CRITICAL CVEs (Trivy) |
 | `make compose-up` / `make compose-down` | Start / stop the Authentik Compose stack |
+| `make compose-forward-auth-up` / `make compose-forward-auth-down` | Start / stop the Traefik + whoami forward-auth demo |
+| `make e2e-forward-auth` | E2E: configure forward-auth, assert an unauth request is intercepted (302) |
 | `make kind-up` / `make kind-down` | Create+deploy / destroy the KinD cluster |
 | `make k8s-generate` | Regenerate `k8s/postgresql/` from the pinned Authentik chart + `values.yml` |
 | `make e2e-compose` / `make e2e` | End-to-end against Compose / KinD |

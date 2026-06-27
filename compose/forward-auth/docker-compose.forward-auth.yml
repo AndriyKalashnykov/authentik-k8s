@@ -1,0 +1,54 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/compose-spec/compose-spec/master/schema/compose-spec.json
+#
+# Forward-auth demo overlay — adds Traefik + traefik/whoami to the base Authentik
+# stack so an Authentik proxy provider (created by the Go provisioner with
+# AUTHENTIK_FORWARD_AUTH_ENABLED=true) gates the whoami app via forwardAuth.
+#
+# Run together with the base stack (project dir = ../, so paths below are
+# relative to compose/):
+#   docker compose -f docker-compose.yml \
+#                  -f forward-auth/docker-compose.forward-auth.yml up -d
+# or just `make compose-forward-auth-up` from provisioner/.
+#
+# Then browse https://whoami.127-0-0-1.sslip.io (accept the self-signed cert) —
+# Traefik redirects to the Authentik login; after login whoami echoes the
+# X-authentik-* identity headers.
+name: authentik
+
+services:
+  traefik:
+    image: traefik:v3.7.5
+    restart: unless-stopped
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --providers.file.directory=/etc/traefik/dynamic
+      - --providers.file.watch=true
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      # Modern replacement for the deprecated per-middleware trustForwardHeader:
+      # trust X-Forwarded-* so Authentik can rebuild the original request URL.
+      - --entrypoints.websecure.forwardedHeaders.insecure=true
+      - --api.dashboard=true
+      - --api.insecure=true
+    ports:
+      - "0.0.0.0:${TRAEFIK_DASHBOARD_PORT:-8081}:8080"
+      - "0.0.0.0:${TRAEFIK_HTTP_PORT:-80}:80"
+      - "0.0.0.0:${TRAEFIK_HTTPS_PORT:-443}:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ./forward-auth/traefik/dynamic.yml:/etc/traefik/dynamic/dynamic.yml:ro
+    depends_on:
+      - server
+
+  whoami:
+    image: traefik/whoami:v1.11.0
+    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - "traefik.http.routers.whoami.rule=Host(`${WHOAMI_HOST:-whoami.127-0-0-1.sslip.io}`)"
+      - traefik.http.routers.whoami.entrypoints=websecure
+      - traefik.http.routers.whoami.tls=true
+      # Gate every whoami request through the Authentik forwardAuth middleware
+      # (defined in forward-auth/traefik/dynamic.yml, hence the @file provider).
+      - traefik.http.routers.whoami.middlewares=authentik@file

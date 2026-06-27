@@ -11,6 +11,9 @@ IMAGE      := $(IMAGE_REPO):$(IMAGE_TAG)
 # --- Compose (Authentik stack — lightweight local alternative to KinD) ---
 COMPOSE_DIR := ../compose
 COMPOSE     := docker compose --project-directory $(COMPOSE_DIR) -f $(COMPOSE_DIR)/docker-compose.yml
+# Base stack + the Traefik/whoami forward-auth overlay.
+COMPOSE_FA  := $(COMPOSE) -f $(COMPOSE_DIR)/forward-auth/docker-compose.forward-auth.yml
+WHOAMI_URL  ?= https://whoami.127-0-0-1.sslip.io
 
 # --- KinD e2e ---
 KIND_CLUSTER_NAME ?= authentik-e2e
@@ -144,7 +147,7 @@ mermaid-lint:
 compose-lint:
 	@command -v docker >/dev/null 2>&1 || { echo "ERROR: docker is required for compose-lint"; exit 1; }
 	@docker run --rm -v "$(PWD)/..:/w:ro" -w /w zavoloklom/dclint:$(DCLINT_VERSION) \
-		--max-warnings 0 compose/docker-compose.yml
+		--max-warnings 0 compose/docker-compose.yml compose/forward-auth/docker-compose.forward-auth.yml
 	@echo "compose-lint: OK"
 
 #static-check: @ Composite quality gate (alignment + lint + hadolint + mermaid + compose + vulncheck + trivy-fs + secrets)
@@ -200,6 +203,60 @@ compose-down:
 #compose-logs: @ Follow Authentik compose logs
 compose-logs:
 	@$(COMPOSE) logs -f
+
+# ---------------------------------------------------------------------------
+# Forward-auth demo (Traefik + traefik/whoami gated by Authentik)
+# ---------------------------------------------------------------------------
+
+#compose-forward-auth-up: @ Start Authentik + Traefik + whoami and configure forward-auth (browse $(WHOAMI_URL))
+compose-forward-auth-up: deps
+	@[ -f $(COMPOSE_DIR)/.env ] || cp $(COMPOSE_DIR)/.env.example $(COMPOSE_DIR)/.env
+	@$(COMPOSE_FA) up -d
+	@echo "Waiting for Authentik server readiness (https://127.0.0.1:9443/-/health/ready/)..."
+	@for i in $$(seq 1 60); do \
+		code=$$(curl -sk -o /dev/null -w '%{http_code}' --max-time 5 https://127.0.0.1:9443/-/health/ready/ 2>/dev/null || true); \
+		if [ "$$code" = "204" ] || [ "$$code" = "200" ]; then echo "Authentik ready (HTTP $$code)"; break; fi; \
+		if [ "$$i" = "60" ]; then echo "ERROR: Authentik not ready within 300s"; $(COMPOSE_FA) ps; exit 1; fi; \
+		sleep 5; \
+	done
+	@echo "Waiting for default blueprint flows to import (the worker imports them after server-ready)..."
+	@set -a; . $(COMPOSE_DIR)/.env; set +a; \
+	 for i in $$(seq 1 60); do \
+	   if curl -sk -H "Authorization: Bearer $$AUTHENTIK_BOOTSTRAP_TOKEN" \
+	        "https://127.0.0.1:9443/api/v3/flows/instances/?slug=default-provider-authorization-implicit-consent" \
+	        2>/dev/null | grep -q 'default-provider-authorization-implicit-consent'; then echo "blueprint flows ready"; break; fi; \
+	   if [ "$$i" = "60" ]; then echo "ERROR: authorization flow not imported within 300s"; $(COMPOSE_FA) logs --tail=40 worker; exit 1; fi; \
+	   sleep 5; \
+	 done
+	@echo "Configuring forward-auth (proxy provider + application + embedded outpost binding)..."
+	@set -a; . $(COMPOSE_DIR)/.env; set +a; \
+	 AUTHENTIK_SCHEME=https AUTHENTIK_HOST=127.0.0.1:9443 \
+	 AUTHENTIK_BOOTSTRAP_TOKEN="$$AUTHENTIK_BOOTSTRAP_TOKEN" \
+	 AUTHENTIK_PROVISION_ORGS=false AUTHENTIK_FORWARD_AUTH_ENABLED=true \
+	 go run .
+	@echo ""
+	@echo "Forward-auth demo ready. Browse $(WHOAMI_URL) (accept the self-signed cert);"
+	@echo "Traefik redirects to the Authentik login (akadmin / the bootstrap password),"
+	@echo "then whoami echoes the X-authentik-* identity headers. Traefik dashboard: http://127.0.0.1:8081"
+
+#compose-forward-auth-down: @ Stop the forward-auth demo stack and remove volumes
+compose-forward-auth-down:
+	@$(COMPOSE_FA) down -v
+
+#e2e-forward-auth: @ E2E: up -> configure forward-auth -> assert unauth request redirects to login -> down
+e2e-forward-auth: deps
+	@trap '$(COMPOSE_FA) down -v >/dev/null 2>&1 || true' EXIT INT TERM; \
+	 $(MAKE) --no-print-directory compose-forward-auth-up && { \
+	   echo "Asserting an unauthenticated request to whoami is redirected to Authentik..."; \
+	   for i in $$(seq 1 30); do \
+	     resp=$$(curl -sk -o /dev/null -w '%{http_code} %{redirect_url}' -H 'Host: whoami.127-0-0-1.sslip.io' --max-time 5 https://127.0.0.1/ 2>/dev/null || true); \
+	     code=$${resp%% *}; loc=$${resp#* }; \
+	     if [ "$$code" = "302" ]; then echo "PASS: unauth request to whoami -> HTTP $$code (location: $$loc)"; exit 0; fi; \
+	     sleep 2; \
+	   done; \
+	   echo "FAIL: whoami did not redirect (last HTTP $$code, location '$$loc'); whoami should never 302 on its own"; \
+	   $(COMPOSE_FA) logs --tail=40 traefik server; exit 1; \
+	 }
 
 # ---------------------------------------------------------------------------
 # End-to-end test (build-tagged Go test against a live Authentik)
