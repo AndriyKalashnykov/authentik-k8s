@@ -17,7 +17,7 @@ name: authentik
 
 services:
   traefik:
-    image: traefik:v3.7.5
+    image: traefik:v3.7.5@sha256:e4d98158c01ad752fc1071d4e9573788747230d902cdde00a772516e692d07c9
     restart: unless-stopped
     command:
       - --providers.docker=true
@@ -42,7 +42,7 @@ services:
       - server
 
   whoami:
-    image: traefik/whoami:v1.11.0
+    image: traefik/whoami:v1.11.0@sha256:200689790a0a0ea48ca45992e0450bc26ccab5307375b41c84dfc4f2475937ab
     restart: unless-stopped
     labels:
       - traefik.enable=true
