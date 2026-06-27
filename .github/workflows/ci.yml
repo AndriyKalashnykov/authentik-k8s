@@ -164,9 +164,31 @@ jobs:
       - name: E2E (Authentik via Docker Compose)
         run: make e2e-compose
 
+  # Live forward-auth e2e: stand up Authentik + Traefik + traefik/whoami via
+  # Docker Compose, configure forward-auth with the POC, assert an unauthenticated
+  # whoami request is intercepted (HTTP 302), tear down. Compose-class (same infra
+  # as the e2e job) — gates the forward-auth runtime path the overlay adds.
+  e2e-forward-auth:
+    needs: [changes, build, test]
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.code == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: provisioner
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+        with:
+          install: true
+          cache: true
+          working_directory: provisioner
+      - name: E2E forward-auth (Authentik + Traefik + whoami via Docker Compose)
+        run: make e2e-forward-auth
+
   ci-pass:
     if: always()
-    needs: [changes, static-check, build, test, docker, k8s-drift, e2e]
+    needs: [changes, static-check, build, test, docker, k8s-drift, e2e, e2e-forward-auth]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:

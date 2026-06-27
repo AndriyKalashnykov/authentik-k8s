@@ -222,9 +222,10 @@ compose-forward-auth-up: deps
 	@echo "Waiting for default blueprint flows to import (the worker imports them after server-ready)..."
 	@set -a; . $(COMPOSE_DIR)/.env; set +a; \
 	 for i in $$(seq 1 60); do \
-	   if curl -sk -H "Authorization: Bearer $$AUTHENTIK_BOOTSTRAP_TOKEN" \
-	        "https://127.0.0.1:9443/api/v3/flows/instances/?slug=default-provider-authorization-implicit-consent" \
-	        2>/dev/null | grep -q 'default-provider-authorization-implicit-consent'; then echo "blueprint flows ready"; break; fi; \
+	   if printf 'Authorization: Bearer %s' "$$AUTHENTIK_BOOTSTRAP_TOKEN" \
+	        | curl -sk -H @- \
+	            "https://127.0.0.1:9443/api/v3/flows/instances/?slug=default-provider-authorization-implicit-consent" \
+	            2>/dev/null | grep -q 'default-provider-authorization-implicit-consent'; then echo "blueprint flows ready"; break; fi; \
 	   if [ "$$i" = "60" ]; then echo "ERROR: authorization flow not imported within 300s"; $(COMPOSE_FA) logs --tail=40 worker; exit 1; fi; \
 	   sleep 5; \
 	 done
@@ -367,5 +368,7 @@ ci: static-check test build
 
 .PHONY: help deps deps-check check-toolchain-alignment build run test lint lint-docker \
 	vulncheck mermaid-lint compose-lint trivy-fs secrets static-check image-build image-run image-scan k8s-generate k8s-generate-check update clean renovate-validate \
-	compose-up compose-down compose-logs e2e-compose deps-kind kind-create kind-deploy \
+	compose-up compose-down compose-logs \
+	compose-forward-auth-up compose-forward-auth-down e2e-forward-auth \
+	e2e-compose deps-kind kind-create kind-deploy \
 	e2e kind-destroy kind-up kind-down ci
