@@ -61,7 +61,7 @@ The fastest happy path — start Authentik with Compose, then run the POC agains
 ```bash
 cd provisioner
 make deps          # one-time: install the toolchain (mise + Go/lint/kind/kubectl)
-make compose-up    # start Authentik (PostgreSQL + Redis + server + worker), wait until ready
+make compose-up    # start Authentik (PostgreSQL + server + worker), wait until ready
 make run           # run the POC against https://127.0.0.1:9443
 make compose-down  # tear it down (removes volumes)
 ```
@@ -101,7 +101,7 @@ cp compose/.env.example compose/.env    # Compose stack config
 
 ```bash
 cd provisioner
-make compose-up      # start PostgreSQL + Redis + server + worker, wait until ready
+make compose-up      # start PostgreSQL + server + worker, wait until ready
 make compose-logs    # follow logs
 make compose-down    # stop + remove volumes
 ```
