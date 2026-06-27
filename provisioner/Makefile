@@ -244,18 +244,20 @@ compose-forward-auth-up: deps
 compose-forward-auth-down:
 	@$(COMPOSE_FA) down -v
 
-#e2e-forward-auth: @ E2E: up -> configure forward-auth -> assert unauth request redirects to login -> down
+#e2e-forward-auth: @ E2E: up -> configure forward-auth -> assert unauth request REACHES the Authentik login -> down
 e2e-forward-auth: deps
 	@trap '$(COMPOSE_FA) down -v >/dev/null 2>&1 || true' EXIT INT TERM; \
 	 $(MAKE) --no-print-directory compose-forward-auth-up && { \
-	   echo "Asserting an unauthenticated request to whoami is redirected to Authentik..."; \
+	   echo "Asserting an unauthenticated request to whoami FOLLOWS THROUGH to the Authentik login..."; \
+	   url="$(WHOAMI_URL)"; \
 	   for i in $$(seq 1 30); do \
-	     resp=$$(curl -sk -o /dev/null -w '%{http_code} %{redirect_url}' -H 'Host: whoami.127-0-0-1.sslip.io' --max-time 5 https://127.0.0.1/ 2>/dev/null || true); \
-	     code=$${resp%% *}; loc=$${resp#* }; \
-	     if [ "$$code" = "302" ]; then echo "PASS: unauth request to whoami -> HTTP $$code (location: $$loc)"; exit 0; fi; \
+	     code=$$(curl -Lsk -o /tmp/fa-login.html -w '%{http_code}' --max-time 10 "$$url/" 2>/dev/null || true); \
+	     if [ "$$code" = "200" ] && grep -q 'ak-flow-executor' /tmp/fa-login.html 2>/dev/null; then \
+	       echo "PASS: unauth request to $$url followed the redirect chain to the Authentik login (HTTP 200, flow executor present)"; exit 0; fi; \
 	     sleep 2; \
 	   done; \
-	   echo "FAIL: whoami did not redirect (last HTTP $$code, location '$$loc'); whoami should never 302 on its own"; \
+	   echo "FAIL: $$url did not reach a working Authentik login (last HTTP $$code; the embedded outpost likely redirects to an unreachable host — check authentik_host)"; \
+	   echo "--- final page (head) ---"; head -c 400 /tmp/fa-login.html 2>/dev/null; echo; \
 	   $(COMPOSE_FA) logs --tail=40 traefik server; exit 1; \
 	 }
 

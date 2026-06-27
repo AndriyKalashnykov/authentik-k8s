@@ -42,6 +42,8 @@ func testCfg() ForwardAuthConfig {
 		ExternalHost:          "https://whoami.127-0-0-1.sslip.io",
 		Mode:                  "forward_single",
 		CookieDomain:          "127-0-0-1.sslip.io",
+		AuthentikHost:         "https://127.0.0.1:9443",
+		AuthentikHostInsecure: true,
 		AuthorizationFlowSlug: "default-provider-authorization-implicit-consent",
 		InvalidationFlowSlug:  "default-provider-invalidation-flow",
 	}
@@ -227,7 +229,7 @@ func TestFindEmbeddedOutpost(t *testing.T) {
 	}
 }
 
-func TestBindProviderToOutpost(t *testing.T) {
+func TestConfigureEmbeddedOutpost(t *testing.T) {
 	var method, path string
 	var body map[string]any
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
@@ -236,10 +238,10 @@ func TestBindProviderToOutpost(t *testing.T) {
 		writeJSON(t, w, http.StatusOK, embeddedOutpostJSON("7"))
 	})
 
-	op := outpostFixture(t,"")
-	resp, err := BindProviderToOutpost(context.Background(), client, op, 7)
+	op := outpostFixture(t, "")
+	resp, err := ConfigureEmbeddedOutpost(context.Background(), client, op, 7, testCfg())
 	if err != nil {
-		t.Fatalf("BindProviderToOutpost: %v", err)
+		t.Fatalf("ConfigureEmbeddedOutpost: %v", err)
 	}
 	if method != http.MethodPatch || path != "/api/v3/outposts/instances/outpost-uuid/" {
 		t.Errorf("request = %s %s, want PATCH /api/v3/outposts/instances/outpost-uuid/", method, path)
@@ -248,12 +250,24 @@ func TestBindProviderToOutpost(t *testing.T) {
 	if !ok || len(provs) != 1 || provs[0] != float64(7) {
 		t.Errorf("providers = %v, want [7]", body["providers"])
 	}
+	// The fix: the PATCH must set a browser-reachable authentik_host on the
+	// outpost config (else the login redirect falls back to http://localhost).
+	cfgBody, ok := body["config"].(map[string]any)
+	if !ok {
+		t.Fatalf("request body has no config object: %v", body["config"])
+	}
+	if cfgBody["authentik_host"] != "https://127.0.0.1:9443" {
+		t.Errorf("config.authentik_host = %v, want https://127.0.0.1:9443", cfgBody["authentik_host"])
+	}
+	if cfgBody["authentik_host_insecure"] != true {
+		t.Errorf("config.authentik_host_insecure = %v, want true", cfgBody["authentik_host_insecure"])
+	}
 	if resp == nil || resp.StatusCode != http.StatusOK {
 		t.Errorf("resp = %v, want 200", resp)
 	}
 }
 
-func TestBindProviderToOutpostAlreadyBound(t *testing.T) {
+func TestConfigureEmbeddedOutpostNoOp(t *testing.T) {
 	var patched bool
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPatch {
@@ -262,13 +276,18 @@ func TestBindProviderToOutpostAlreadyBound(t *testing.T) {
 		writeJSON(t, w, http.StatusOK, embeddedOutpostJSON("7"))
 	})
 
-	op := outpostFixture(t,"7") // already has provider 7
-	resp, err := BindProviderToOutpost(context.Background(), client, op, 7)
+	op := outpostFixture(t, "7") // already has provider 7
+	// ...and already has the matching authentik_host → fully configured.
+	op.Config = map[string]any{
+		"authentik_host":          "https://127.0.0.1:9443",
+		"authentik_host_insecure": true,
+	}
+	resp, err := ConfigureEmbeddedOutpost(context.Background(), client, op, 7, testCfg())
 	if err != nil {
-		t.Fatalf("BindProviderToOutpost: %v", err)
+		t.Fatalf("ConfigureEmbeddedOutpost: %v", err)
 	}
 	if patched {
-		t.Error("BindProviderToOutpost issued a PATCH for an already-bound provider")
+		t.Error("ConfigureEmbeddedOutpost issued a PATCH when provider was bound and authentik_host already matched")
 	}
 	if resp != nil {
 		t.Errorf("resp = %v, want nil (no-op)", resp)

@@ -39,16 +39,25 @@ make e2e-forward-auth            # up -> configure -> assert unauth request 302s
 2. A request to `https://whoami.127-0-0-1.sslip.io` hits Traefik. The
    `authentik@file` middleware calls
    `http://server:9000/outpost.goauthentik.io/auth/traefik`.
-3. Unauthenticated → Authentik replies `302` to its login flow; after login,
-   whoami echoes the `X-authentik-*` identity headers Authentik injects.
+3. Unauthenticated → Authentik replies `302`, redirecting the browser to the
+   login flow at the embedded outpost's `authentik_host` (the provisioner sets
+   this to `https://127.0.0.1:9443`); after login, whoami echoes the
+   `X-authentik-*` identity headers Authentik injects.
 
 Notes:
 - The `127-0-0-1.sslip.io` wildcard resolves `*.127-0-0-1.sslip.io` → `127.0.0.1`
   with no `/etc/hosts` edits. TLS is Traefik's default self-signed cert (use
-  `curl -k` / accept the browser warning).
+  `curl -k` / accept the browser warning); the login at `https://127.0.0.1:9443`
+  presents Authentik's own self-signed cert — accept that one too.
+- **`authentik_host` is load-bearing.** The provisioner sets the embedded
+  outpost's `authentik_host` (`AUTHENTIK_FORWARD_AUTH_HOST`, default
+  `https://127.0.0.1:9443`) so the login redirect targets a browser-reachable
+  host. Without it the outpost falls back to `http://localhost` → 404. This is
+  the *primary* `authentik_host` field; `authentik_host_browser` and
+  `trustForwardHeader` do **not** control it.
+- `trustForwardHeader: true` is set on the forwardAuth middleware so the outpost
+  receives the original request host (for the callback). (The entrypoint's
+  `forwardedHeaders.insecure` governs trusting client headers — a separate knob.)
 - Login is `akadmin` plus the `AUTHENTIK_BOOTSTRAP_PASSWORD` value in
   `../.env.example`.
 - Traefik dashboard: <http://127.0.0.1:8081>.
-- `trustForwardHeader` is intentionally **not** set — it is deprecated since
-  Traefik v3.6.14; the `websecure` entrypoint's `forwardedHeaders.insecure=true`
-  is the modern replacement that lets Authentik reconstruct the original URL.

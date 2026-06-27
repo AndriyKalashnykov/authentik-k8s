@@ -214,11 +214,12 @@ then [Traefik](https://traefik.io/)'s `forwardAuth` middleware gates a
 cd provisioner
 make compose-forward-auth-up     # Authentik + Traefik + whoami, then configure forward-auth
 # browse https://whoami.127-0-0-1.sslip.io (accept the self-signed cert):
-#   -> redirected to the Authentik login (akadmin / the bootstrap password)
+#   -> redirected to the Authentik login at https://127.0.0.1:9443 (accept that
+#      cert too); sign in as akadmin / the bootstrap password
 #   -> after login, whoami echoes the X-authentik-* identity headers
 make compose-forward-auth-down   # tear it down (removes volumes)
 
-make e2e-forward-auth            # automated: up -> configure -> assert unauth -> 302 -> down
+make e2e-forward-auth            # automated: up -> configure -> follow the redirect -> assert the Authentik login is reachable -> down
 ```
 
 The provisioner wiring is opt-in via `AUTHENTIK_FORWARD_AUTH_ENABLED=true` (off by
@@ -229,8 +230,12 @@ existing instance — `make compose-forward-auth-up` sets both gates for you. Th
 `127-0-0-1.sslip.io` wildcard host resolves `*.127-0-0-1.sslip.io` → `127.0.0.1`
 with no `/etc/hosts` edits. Flow PKs are resolved at runtime from their slugs
 (`default-provider-authorization-implicit-consent`, `default-provider-invalidation-flow`)
-— never hardcoded — and the whole setup is idempotent. The Traefik dashboard is
-served at `http://127.0.0.1:8081` (`TRAEFIK_DASHBOARD_PORT` in `compose/.env.example`).
+— never hardcoded — and the whole setup is idempotent. The provisioner also sets
+the embedded outpost's `authentik_host` to a browser-reachable Authentik URL
+(`AUTHENTIK_FORWARD_AUTH_HOST`, default `https://127.0.0.1:9443`) — without it the
+outpost would redirect the login to `http://localhost` and the browser would 404.
+The Traefik dashboard is served at `http://127.0.0.1:8081`
+(`TRAEFIK_DASHBOARD_PORT` in `compose/.env.example`).
 
 ```mermaid
 sequenceDiagram
