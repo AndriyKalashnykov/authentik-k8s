@@ -27,6 +27,22 @@ const (
 	defaultOrg2UserToken  = "svkH90FMYlnXPA5JHxePVQkozTjXReT6rsdQ2BXedwI5mtrFYR5mfrunMt4B"
 )
 
+// Forward-auth demo fallback defaults (opt-in via AUTHENTIK_FORWARD_AUTH_ENABLED).
+// These wire an Authentik proxy provider in forward_domain mode + an application,
+// bound to the built-in embedded outpost, so Traefik's forwardAuth middleware can
+// gate the traefik/whoami app (see compose/forward-auth/). The flow slugs are the
+// stock flows every Authentik ships; PKs are resolved at runtime, never hardcoded.
+const (
+	defaultFwdProviderName     = "whoami"
+	defaultFwdAppName          = "whoami"
+	defaultFwdAppSlug          = "whoami"
+	defaultFwdExternalHost     = "https://whoami.127-0-0-1.sslip.io"
+	defaultFwdMode             = "forward_single" // single whoami app; forward_domain for SSO
+	defaultFwdCookieDomain     = "127-0-0-1.sslip.io"
+	defaultFwdAuthzFlow        = "default-provider-authorization-implicit-consent"
+	defaultFwdInvalidationFlow = "default-provider-invalidation-flow"
+)
+
 // Demo naming convention. Group / user / token-identifier names are derived
 // from the org name (see deriveNames + .env.example); these are the fixed
 // role/group segments and join tokens, single-sourced so the scheme lives in
@@ -176,11 +192,39 @@ func main() {
 		{org2, roleUser, groupUsers, false, env("AUTHENTIK_ORG2_USER_TOKEN", defaultOrg2UserToken)},
 	}
 
-	for _, r := range requests {
-		groupName, userName, tokenIdentifier, userPath := deriveNames(r.org, r.role, r.group)
-		if err := CreateGroupsAndUsers(ctx, scheme, host, bootstrapToken,
-			groupName, r.superuser, userName, userPath, password, tokenIdentifier, r.token); err != nil {
-			log.Fatalf("error: %v", err)
+	// The org/user/token provisioning is not idempotent (re-creating an existing
+	// group/user fails), so it can be skipped — e.g. when only (re)running the
+	// idempotent forward-auth setup against an already-provisioned instance.
+	if env("AUTHENTIK_PROVISION_ORGS", "true") == "true" {
+		for _, r := range requests {
+			groupName, userName, tokenIdentifier, userPath := deriveNames(r.org, r.role, r.group)
+			if err := CreateGroupsAndUsers(ctx, scheme, host, bootstrapToken,
+				groupName, r.superuser, userName, userPath, password, tokenIdentifier, r.token); err != nil {
+				log.Fatalf("error: %v", err)
+			}
 		}
+	}
+
+	// Opt-in: wire a forward-auth proxy provider + application for the
+	// traefik/whoami demo and bind it to the embedded outpost. Disabled by
+	// default so the core POC stays a pure user/group/token demo.
+	if env("AUTHENTIK_FORWARD_AUTH_ENABLED", "false") == "true" {
+		cfg := authentik.ForwardAuthConfig{
+			ProviderName:          env("AUTHENTIK_FORWARD_AUTH_PROVIDER_NAME", defaultFwdProviderName),
+			AppName:               env("AUTHENTIK_FORWARD_AUTH_APP_NAME", defaultFwdAppName),
+			AppSlug:               env("AUTHENTIK_FORWARD_AUTH_APP_SLUG", defaultFwdAppSlug),
+			ExternalHost:          env("AUTHENTIK_FORWARD_AUTH_EXTERNAL_HOST", defaultFwdExternalHost),
+			Mode:                  env("AUTHENTIK_FORWARD_AUTH_MODE", defaultFwdMode),
+			CookieDomain:          env("AUTHENTIK_FORWARD_AUTH_COOKIE_DOMAIN", defaultFwdCookieDomain),
+			AuthorizationFlowSlug: env("AUTHENTIK_FORWARD_AUTH_AUTHZ_FLOW", defaultFwdAuthzFlow),
+			InvalidationFlowSlug:  env("AUTHENTIK_FORWARD_AUTH_INVALIDATION_FLOW", defaultFwdInvalidationFlow),
+		}
+		akadminConfig := authentik.CreateConfiguration(scheme, host, bootstrapToken)
+		akadminApiClient := api.NewAPIClient(akadminConfig)
+		if err := authentik.SetupForwardAuth(ctx, akadminApiClient, cfg); err != nil {
+			log.Fatalf("forward-auth setup: %v", err)
+		}
+		log.Printf("forward-auth configured: provider %q, app %q (%s) bound to embedded outpost",
+			cfg.ProviderName, cfg.AppName, cfg.ExternalHost)
 	}
 }
