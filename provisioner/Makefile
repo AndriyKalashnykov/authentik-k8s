@@ -31,6 +31,12 @@ KIND_NODE_IMAGE := kindest/node:v1.36.1@sha256:3489c7674813ba5d8b1a9977baea8a6e5
 # renovate: datasource=docker depName=minlag/mermaid-cli
 MERMAID_CLI_VERSION := 11.15.0
 
+# dclint (docker-compose-linter) is a docker-only tool (no mise backend); pinned
+# here, Renovate-tracked via the Makefile customManager. Used by `compose-lint`
+# to validate the Compose file (rule config in repo-root .dclintrc.yaml).
+# renovate: datasource=docker depName=zavoloklom/dclint
+DCLINT_VERSION := 3.1.0
+
 # Make recipes don't source shell rc files; put mise's shims dir on PATH so
 # every mise-managed tool (go, golangci-lint, govulncheck, hadolint, kind,
 # kubectl) resolves inside recipes.
@@ -127,8 +133,15 @@ mermaid-lint:
 	[ $$FAILED -eq 0 ] || { echo "mermaid-lint: FAILED"; exit 1; }
 	@echo "mermaid-lint: OK"
 
-#static-check: @ Composite quality gate (alignment + lint + hadolint + mermaid + vulncheck + trivy-fs + secrets)
-static-check: deps check-toolchain-alignment lint lint-docker mermaid-lint vulncheck trivy-fs secrets
+#compose-lint: @ Lint the Compose file (zavoloklom/dclint; rules in .dclintrc.yaml, --max-warnings 0)
+compose-lint:
+	@command -v docker >/dev/null 2>&1 || { echo "ERROR: docker is required for compose-lint"; exit 1; }
+	@docker run --rm -v "$(PWD)/..:/w:ro" -w /w zavoloklom/dclint:$(DCLINT_VERSION) \
+		--max-warnings 0 compose/docker-compose.yml
+	@echo "compose-lint: OK"
+
+#static-check: @ Composite quality gate (alignment + lint + hadolint + mermaid + compose + vulncheck + trivy-fs + secrets)
+static-check: deps check-toolchain-alignment lint lint-docker mermaid-lint compose-lint vulncheck trivy-fs secrets
 	@echo "Static check passed."
 
 #image-build: @ Build the POC container image
@@ -264,6 +277,6 @@ ci: static-check test build
 	@echo "Local CI pipeline passed."
 
 .PHONY: help deps deps-check check-toolchain-alignment build run test lint lint-docker \
-	vulncheck mermaid-lint trivy-fs secrets static-check image-build image-run update clean renovate-validate \
+	vulncheck mermaid-lint compose-lint trivy-fs secrets static-check image-build image-run update clean renovate-validate \
 	compose-up compose-down compose-logs e2e-compose deps-kind kind-create kind-deploy \
 	e2e kind-destroy kind-up kind-down ci

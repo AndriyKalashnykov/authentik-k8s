@@ -1,0 +1,16 @@
+# docker-compose-linter (dclint) config — used by `make compose-lint`
+# (zavoloklom/dclint). Catches obsolete/incorrect Compose config (e.g. the
+# obsolete top-level `version` field, which dclint flags as an ERROR via
+# no-version-field). Run with `--max-warnings 0`, so any enabled warning fails.
+#
+# Two cosmetic rules are disabled because they fight this repo's conventions
+# rather than catching real problems:
+rules:
+  # Pure key-ordering preference. Enforcing it would churn + displace the
+  # load-bearing inline comments in docker-compose.yml (the postgres:18
+  # data-dir relocation note, the worker docker.sock notes).
+  service-keys-order: 0
+  # Misfires on env-externalized ports: our ports are already double-quoted
+  # `"0.0.0.0:${PORT:-5432}:5432"` (required by the parameter-externalization
+  # convention), but dclint still flags them wanting single quotes.
+  require-quotes-in-ports: 0
