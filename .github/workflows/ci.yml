@@ -20,10 +20,11 @@ permissions:
 # mise-action reads provisioner/.mise.toml via its own working_directory input.
 
 jobs:
-  # Cheap path detector: only Go-project or workflow changes run CI.
-  # Doc / k8s / compose changes skip the heavy jobs (positive
-  # allow-list — the code paths here are enumerable). CLAUDE.md is project
-  # config, not docs, so it counts as code.
+  # Cheap path detector: only Go-project, workflow, or Compose changes run CI.
+  # Doc / k8s changes skip the heavy jobs (positive allow-list — the code paths
+  # here are enumerable). CLAUDE.md is project config, not docs, so it counts as
+  # code. compose/** + .dclintrc.yaml are included because static-check runs
+  # compose-lint (dclint) and the e2e job exercises the Compose stack.
   changes:
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -39,6 +40,8 @@ jobs:
               - 'provisioner/**'
               - '.github/workflows/**'
               - 'CLAUDE.md'
+              - 'compose/**'
+              - '.dclintrc.yaml'
 
   static-check:
     needs: [changes]

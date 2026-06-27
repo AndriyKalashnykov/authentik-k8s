@@ -193,7 +193,8 @@ Run `make help` for the full list. Common targets:
 | `make lint` | Run golangci-lint + verify `go.mod`/`go.sum` are tidy |
 | `make lint-docker` | Lint the Dockerfile with hadolint |
 | `make vulncheck` | Scan dependencies with govulncheck |
-| `make static-check` | Composite gate: toolchain alignment + lint + hadolint + vulncheck |
+| `make compose-lint` | Lint the Compose file with dclint (rules in `.dclintrc.yaml`) |
+| `make static-check` | Composite gate: alignment + lint + hadolint + mermaid + compose + vulncheck + trivy-fs + secrets |
 | `make image-build` / `make image-run` | Build / run the distroless container image |
 | `make compose-up` / `make compose-down` | Start / stop the Authentik Compose stack |
 | `make kind-up` / `make kind-down` | Create+deploy / destroy the KinD cluster |

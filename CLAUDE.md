@@ -39,7 +39,7 @@ make -C provisioner kind-up      # Kubernetes: KinD + cloud-provider-kind, appli
 cd provisioner
 cp .env.example .env   # one-time: per-dev config (gitignored); main.go also has the same fallbacks
 make deps     # install mise (if missing) + pinned Go/golangci-lint/govulncheck/hadolint/kind/kubectl
-make ci       # full local pipeline: static-check (align+lint+hadolint+vulncheck) + test + build
+make ci       # full local pipeline: static-check (align+lint+hadolint+mermaid+compose+vulncheck+trivy-fs+secrets) + test + build
 make run      # run the POC against a running Authentik (sources .env.example then .env)
 make test     # go test ./...  (unit + hermetic httptest contract tests)
 make image-build / image-run   # build/run the POC container (config via --env-file)
@@ -102,7 +102,7 @@ cp compose/.env.example  compose/.env    # Compose stack: PG_*, AUTHENTIK_SECRET
 
 - Config is externalized to env vars with fallback defaults (no hardcoded hosts/ports/secrets); see the Environment configuration section. Renovate tracks every pinned version (`renovate.json`); validate with `make renovate-validate`.
 - The client library takes pointers for optional request fields; use the `util.*ToPointer` helpers rather than inlining `&`.
-- **CI**: `.github/workflows/ci.yml` runs `make static-check` + `make build` + `make test` via `jdx/mise-action` (toolchain from `provisioner/.mise.toml`). The Go project is in `provisioner/`, so jobs set `working-directory: provisioner`. A `dorny/paths-filter` `changes` job gates the heavy jobs on `provisioner/**`/`.github/workflows/**`/`CLAUDE.md` edits — doc/k8s/compose changes skip CI; a `ci-pass` job aggregates results. No tags/publish/e2e (the POC needs a live Authentik instance). No secrets required.
+- **CI**: `.github/workflows/ci.yml` runs `make static-check` + `make build` + `make test` via `jdx/mise-action` (toolchain from `provisioner/.mise.toml`). The Go project is in `provisioner/`, so jobs set `working-directory: provisioner`. A `dorny/paths-filter` `changes` job gates the heavy jobs on `provisioner/**`/`.github/workflows/**`/`CLAUDE.md`/`compose/**`/`.dclintrc.yaml` edits (compose is included so `static-check`'s `compose-lint` + the `e2e` job run on Compose changes) — doc/k8s changes skip CI; a `ci-pass` job aggregates results. No tags/publish/e2e (the POC needs a live Authentik instance). No secrets required.
 - The local quality gate (`provisioner/Makefile` → `make ci`: golangci-lint + govulncheck + go-mod-tidy + toolchain-alignment) mirrors CI. `.golangci.yml` runs the standard linters; gosec is intentionally omitted (the POC hardcodes test tokens and skips TLS verify by design — documented in `.golangci.yml`).
 - **Test layers**:
   - *Unit + hermetic httptest contracts* (`make test`, no infra): `internal/authentik` (100%) — `CreateConfiguration` auth-header contract + httptest contracts for every `CoreApi` wrapper at the real `/api/v3/...` paths; `internal/util` (87.5%); `main` (66%) — `CreateGroupsAndUsers` whole-flow vs a mock Authentik (`main_test.go`). `CreateGroupsAndUsers` returns `error` (not `log.Panicf`) so the flow is testable.
