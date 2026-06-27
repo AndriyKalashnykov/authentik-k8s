@@ -21,7 +21,7 @@ The repo has two halves:
 flowchart LR
     POC["POC binary (provisioner/)<br/>Go client goauthentik.io/api/v3"]
 
-    subgraph AUTHENTIK["Authentik stack — run EITHER way"]
+    subgraph AUTHENTIK["Authentik stack — deploy via Docker Compose OR KinD"]
         direction TB
         SERVER["Authentik server<br/>REST API + Web UI"]
         WORKER["Authentik worker<br/>background tasks"]
