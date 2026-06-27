@@ -119,7 +119,7 @@ make kind-down  # delete cluster, stop cloud-provider-kind, prune kindccm-* side
 
 ## Running the POC
 
-For each of `org-01` and `org-02` (an admin and a regular user), the POC:
+For each demo org — `org-01` and `org-02` — and for both an admin and a regular user (four group + user pairs in total: e.g. group `org-01-admins` with user `org-01-admin`), the POC:
 
 1. creates the group and the user (assigned to the group),
 2. sets the user's password and creates an OAuth API token,
