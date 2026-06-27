@@ -59,11 +59,12 @@ helm repo add authentik https://charts.goauthentik.io && helm repo update
 helm template authentik authentik/authentik -f ./k8s/postgresql/values.yml > ./k8s/postgresql/authentik-postgresql.yml
 ```
 
-Default admin login: `akadmin` (Authentik's fixed bootstrap admin user). The
-password is **not** restated here — it is the `AUTHENTIK_BOOTSTRAP_PASSWORD` value,
-whose single source of truth is `compose/.env.example` (Compose) and
-`k8s/postgresql/authentik-postgresql.yml` (KinD). Read it with
-`grep AUTHENTIK_BOOTSTRAP_PASSWORD compose/.env.example`.
+Default admin login — **username** `akadmin` (Authentik's fixed bootstrap user;
+hardcoded, no env var, so stated literally). The **password** is the *value* of
+`AUTHENTIK_BOOTSTRAP_PASSWORD` (not restated here; single source of truth:
+`compose/.env.example` for Compose, `k8s/postgresql/authentik-postgresql.yml` for
+KinD) — extract just the value with
+`grep AUTHENTIK_BOOTSTRAP_PASSWORD compose/.env.example | cut -d= -f2`.
 
 ## Environment configuration (`.env.example`)
 

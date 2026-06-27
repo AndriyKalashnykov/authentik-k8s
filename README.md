@@ -209,10 +209,11 @@ Run `make help` for the full list. Common targets:
 
 ## Web UI
 
-Log in as `akadmin` (Authentik's default bootstrap admin); the password is the
-`AUTHENTIK_BOOTSTRAP_PASSWORD` value in [`compose/.env.example`](compose/.env.example)
-(`grep AUTHENTIK_BOOTSTRAP_PASSWORD compose/.env.example`) — the single source of
-truth (Compose: `https://localhost:9443/if/admin/`). See [docs/web-ui.md](docs/web-ui.md)
+At the login screen enter username `akadmin` (Authentik's fixed bootstrap admin,
+hardcoded — no env var); at the password screen enter the **value** of
+`AUTHENTIK_BOOTSTRAP_PASSWORD` from [`compose/.env.example`](compose/.env.example),
+its single source of truth — `grep AUTHENTIK_BOOTSTRAP_PASSWORD compose/.env.example | cut -d= -f2`.
+(Compose admin UI: `https://localhost:9443/if/admin/`.) See [docs/web-ui.md](docs/web-ui.md)
 for annotated screenshots of the provisioned users, groups, and tokens, plus how
 to regenerate them.
 

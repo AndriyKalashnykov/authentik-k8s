@@ -3,14 +3,20 @@
 Screenshots of the Authentik admin interface after the provisioner has created
 the demo `org-01` / `org-02` groups, users, and API tokens.
 
-Log in as `akadmin` (Authentik's default bootstrap admin). The password is the
-`AUTHENTIK_BOOTSTRAP_PASSWORD` value in [`../compose/.env.example`](../compose/.env.example)
-— the single source of truth (for the KinD deployment it's the same key in
-`../k8s/postgresql/authentik-postgresql.yml`). Read it with:
+The Authentik login flow has two screens — an **Identification** screen (username
+or email), then a **Password** screen. Enter:
 
-```bash
-grep AUTHENTIK_BOOTSTRAP_PASSWORD compose/.env.example
-```
+- **Username** (Identification screen): `akadmin` — Authentik's bootstrap admin.
+  This username is hardcoded by Authentik (there is no env var for it), so it is
+  stated literally here.
+- **Password** (Password screen): the **value** of `AUTHENTIK_BOOTSTRAP_PASSWORD`
+  in [`../compose/.env.example`](../compose/.env.example) — the single source of
+  truth (KinD: the same key in `../k8s/postgresql/authentik-postgresql.yml`). Print
+  just the value (the part after `=`) and type that into the Password field:
+
+  ```bash
+  grep AUTHENTIK_BOOTSTRAP_PASSWORD compose/.env.example | cut -d= -f2
+  ```
 
 - **Docker Compose:** `https://localhost:9443/if/admin/`
 - **Kubernetes:** `https://<LB-IP>:443/if/admin/` (get the IP via `kubectl get svc authentik-server -o jsonpath='{.status.loadBalancer.ingress[0].ip}'`)
