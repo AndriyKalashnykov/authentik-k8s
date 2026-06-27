@@ -24,24 +24,14 @@ services:
       - .env
     ports:
       - "0.0.0.0:${PG_PORT_HTTP:-5432}:5432"
-  redis:
-    image: docker.io/library/redis:8-alpine@sha256:9d317178eceac8454a2284a9e6df2466b93c745529947f0cd42a0fa9609d7005
-    command: --save 60 1 --loglevel warning
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "redis-cli ping | grep PONG"]
-      start_period: 20s
-      interval: 30s
-      retries: 5
-      timeout: 3s
-    volumes:
-      - redis:/data
+  # NOTE: Authentik removed the Redis dependency in 2025.10 — caching, the task
+  # broker, and WebSocket channels are all PostgreSQL-backed now. This stack runs
+  # 2026.5, so there is no Redis/Valkey service.
   server:
     image: ${AUTHENTIK_IMAGE:-ghcr.io/goauthentik/server}:${AUTHENTIK_TAG:-2026.5}
     restart: unless-stopped
     command: server
     environment:
-      AUTHENTIK_REDIS__HOST: redis
       AUTHENTIK_POSTGRESQL__HOST: postgresql
       AUTHENTIK_POSTGRESQL__USER: ${PG_USER:-authentik}
       AUTHENTIK_POSTGRESQL__NAME: ${PG_DB:-authentik}
@@ -59,7 +49,6 @@ services:
     restart: unless-stopped
     command: worker
     environment:
-      AUTHENTIK_REDIS__HOST: redis
       AUTHENTIK_POSTGRESQL__HOST: postgresql
       AUTHENTIK_POSTGRESQL__USER: ${PG_USER:-authentik}
       AUTHENTIK_POSTGRESQL__NAME: ${PG_DB:-authentik}
@@ -81,6 +70,4 @@ services:
 
 volumes:
   database:
-    driver: local
-  redis:
     driver: local
