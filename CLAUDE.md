@@ -55,7 +55,7 @@ make compose-up / compose-down  # bring the Compose Authentik stack up / tear it
 # --- Forward-auth demo (Traefik + traefik/whoami gated by Authentik) ---
 make compose-forward-auth-up    # base stack + Traefik + whoami, then configure forward-auth (browse https://whoami.127-0-0-1.sslip.io)
 make compose-forward-auth-down  # tear the forward-auth demo down (removes volumes)
-make e2e-forward-auth           # up -> configure -> assert unauth whoami request -> HTTP 302 -> down
+make e2e-forward-auth           # up -> configure -> follow redirect -> assert Authentik login reachable (HTTP 200) -> down
 
 make renovate-validate          # validate renovate.json
 
