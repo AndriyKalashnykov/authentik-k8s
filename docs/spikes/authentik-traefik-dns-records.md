@@ -180,7 +180,8 @@ func BindAppToEmbeddedOutpost(ctx context.Context, apiClient *api.APIClient, pro
 
 **Orchestration** in `provisioner/main.go` (after the existing groups/users flow), domain-wide variant:
 
-1. `FlowsInstancesList(...)` filtered by slug → resolve `default-authentication-flow` /
+1. `FlowsInstancesList(...)` filtered by slug → resolve `default-provider-authorization-implicit-consent`
+   (the provider's **authorization** flow — NOT `default-authentication-flow`) /
    `default-provider-invalidation-flow` PKs (do **not** hardcode PKs — they differ per instance).
 2. `CreateForwardAuthProvider(ctx, c, "Domain Forward Auth Provider", api.PROXYMODE_FORWARD_DOMAIN, "https://"+host, cookieDomain, authzFlow, invFlow)`.
 3. `CreateApplication(ctx, c, "Domain Forward Auth Application", "domain-forward-auth-application", provider.Pk, "")`.
@@ -224,7 +225,7 @@ configures **Authentik's** side of the contract, Traefik config configures **Tra
 
 | Topic | Note |
 |-------|------|
-| **Version discipline** | Confirm `forwardAuth` + embedded-outpost behavior on **Authentik 2026.5** (this repo) vs the guide's 2024-era assumptions, and on **current Traefik** (the guide pins `traefik:3.0.4`, June 2024 — newer 3.x exists). Read the **2026.5** outpost docs before wiring; do not transcribe flow slugs/PKs from the guide — resolve them at runtime via `FlowsInstancesList`. |
+| **Version discipline** | Confirmed against **Authentik 2026.5** + **Traefik v3.7.5** (current as of 2026-06; the guide pins `traefik:3.0.4`, June 2024 — ~7 minors behind + carries CVEs). The forward-auth contract holds on both (verified 2026-06-27). Notes: (1) Traefik `trustForwardHeader` is **deprecated since v3.6.14** — use the entryPoint `forwardedHeaders.trustedIPs` form (the guide already does). (2) The guide's `my-compose` ships **Redis**, which is **obsolete on Authentik 2026.5** — Authentik removed Redis in 2025.10 (cache/broker/channels are PostgreSQL-backed); drop it if mirroring that compose. Do not transcribe flow slugs/PKs from the guide — resolve them at runtime via `FlowsInstancesList`. |
 | **Flow slugs are not stable contracts** | Default flow slugs can change across Authentik releases. The provisioner must **look them up**, not pin them; treat the `.env` slug values as overridable hints with a list-and-resolve fallback. |
 | **DNS Records are Cloudflare- and public-domain-specific** | The guide's ACME `dnsChallenge` requires a real internet-resolvable zone + Cloudflare API token. **KinD/compose labs have no public DNS** → Idea #4 cannot be a default; needs a user decision on whether a real domain is in scope. Alternatives: `nip.io`-style wildcard DNS, `/etc/hosts`/`hostAliases`, or a different lego DNS provider. |
 | **k8s outpost endpoint** | On k8s the forwardAuth address must target the Authentik **Service** DNS (e.g. `http://authentik-server.default.svc:9000/outpost.goauthentik.io/auth/traefik`), not the compose name `authentik_server`. Reconcile with the existing `namespace: default` vs `threeport-api` mismatch noted in `CLAUDE.md`. |
@@ -241,8 +242,8 @@ configures **Authentik's** side of the contract, Traefik config configures **Tra
 - Traefik compose service (Cloudflare token secret): <https://github.com/brokenscripts/authentik_traefik/blob/traefik3/my-compose/traefik/compose.yaml>
 - whoami demo compose: <https://github.com/brokenscripts/authentik_traefik/blob/traefik3/my-compose/whoami/compose.yaml>
 - `.env` (Cloudflare IPs, Authentik config): <https://github.com/brokenscripts/authentik_traefik/blob/traefik3/my-compose/.env>
-- Traefik ACME DNS challenge docs: <https://doc.traefik.io/traefik/https/acme/>
-- Authentik Traefik / forward-auth (proxy provider) docs: <https://docs.goauthentik.io/docs/providers/proxy/>
+- Traefik ACME / certificate-resolver docs: <https://doc.traefik.io/traefik/reference/install-configuration/tls/certificate-resolvers/acme/>
+- Authentik Traefik / forward-auth (proxy provider) docs: <https://docs.goauthentik.io/docs/add-secure-apps/providers/proxy/>
 - Authentik Go client: <https://github.com/goauthentik/client-go> (`goauthentik.io/api/v3 v3.2026050.3`)
 - This repo's provisioner CoreAPI wrappers: `provisioner/internal/authentik/api.go`
 
