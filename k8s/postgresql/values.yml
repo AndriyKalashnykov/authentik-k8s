@@ -1,23 +1,43 @@
+# Single source of truth for the Authentik Helm chart inputs. The committed
+# k8s/postgresql/authentik-postgresql.yml is GENERATED from this by
+# `make -C provisioner k8s-generate` (chart pinned via AUTHENTIK_CHART_VERSION in
+# the provisioner Makefile) + concatenated k8s/postgresql/oss-datastores.yml, with
+# Helm metadata labels stripped. A CI drift gate (k8s-drift job) fails if the
+# committed manifest is out of sync with this file + the pinned chart.
+#
+# Demo credentials — rotate for any real deployment.
 authentik:
-    secret_key: "PleaseGenerateA50CharKey"
-    # This sends anonymous usage-data, stack traces on errors and
-    # performance data to sentry.io, and is fully opt-in
-    error_reporting:
-        enabled: false
-    postgresql:
-        password: "ThisIsNotASecurePassword"
+  secret_key: "PleaseGenerateA50CharKey"
+  # Anonymous usage data / error reporting to sentry.io — opt-in, disabled here.
+  error_reporting:
+    enabled: false
+  # External PostgreSQL (the chart's bundled Bitnami subchart is disabled below).
+  # host matches the OSS postgres Service name in oss-datastores.yml.
+  postgresql:
+    host: "authentik-postgresql"
+    name: "authentik"
+    user: "authentik"
+    password: "ThisIsNotASecurePassword"
+    port: 5432
 
-
-# ingress:
-#     enabled: true
-#     hosts:
-#         - host: authentik.domain.tld
-#           paths:
-#               - path: "/"
-#                 pathType: Prefix
-
+# Disable the chart's bundled Bitnami PostgreSQL subchart — its image was removed
+# from Docker Hub. We run OSS postgres:18-alpine from oss-datastores.yml instead.
+# (Authentik 2026.5 needs NO Redis — task broker, cache, and channels are all
+# PostgreSQL-backed since 2025.10 — so there is no redis subchart to disable.)
 postgresql:
-    enabled: true
-    postgresqlPassword: "ThisIsNotASecurePassword"
-redis:
-    enabled: true
+  enabled: false
+
+# Bootstrap the akadmin password + API token. Authentik reads these from env on
+# first start; set on BOTH server and worker (either can run the bootstrap).
+server:
+  env:
+    - name: AUTHENTIK_BOOTSTRAP_PASSWORD
+      value: "Authentik01234567890!"
+    - name: AUTHENTIK_BOOTSTRAP_TOKEN
+      value: "NoMlxBQuYgfu3j19ygGqhjXenAjrJgOfN5naqmSDBUhdLjYqHKze7yyzY07H"
+worker:
+  env:
+    - name: AUTHENTIK_BOOTSTRAP_PASSWORD
+      value: "Authentik01234567890!"
+    - name: AUTHENTIK_BOOTSTRAP_TOKEN
+      value: "NoMlxBQuYgfu3j19ygGqhjXenAjrJgOfN5naqmSDBUhdLjYqHKze7yyzY07H"

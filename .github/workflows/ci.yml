@@ -30,6 +30,7 @@ jobs:
     timeout-minutes: 2
     outputs:
       code: ${{ steps.filter.outputs.code }}
+      k8s: ${{ steps.filter.outputs.k8s }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
       - uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4
@@ -42,6 +43,10 @@ jobs:
               - 'CLAUDE.md'
               - 'compose/**'
               - '.dclintrc.yaml'
+            k8s:
+              - 'k8s/postgresql/**'
+              - 'provisioner/Makefile'
+              - 'provisioner/.mise.toml'
 
   static-check:
     needs: [changes]
@@ -118,6 +123,27 @@ jobs:
       - name: Build + scan image
         run: make image-scan
 
+  # Drift gate: the committed k8s/postgresql manifest is generated from the pinned
+  # Authentik Helm chart + values.yml. Fail if it's stale (e.g. a Renovate chart
+  # bump without a regen). helm-only (template + diff) — no cluster needed.
+  k8s-drift:
+    needs: [changes]
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.k8s == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: provisioner
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+        with:
+          install: true
+          cache: true
+          working_directory: provisioner
+      - name: Verify k8s manifest matches the pinned chart + values.yml
+        run: make k8s-generate-check
+
   # Live e2e: stand up Authentik via Docker Compose, provision + verify with the
   # Go POC, tear down. No secrets needed (demo bootstrap token from .env.example).
   e2e:
@@ -140,7 +166,7 @@ jobs:
 
   ci-pass:
     if: always()
-    needs: [changes, static-check, build, test, docker, e2e]
+    needs: [changes, static-check, build, test, docker, k8s-drift, e2e]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
