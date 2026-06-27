@@ -1,5 +1,11 @@
 # Spike: Authentik on CockroachDB or YugabyteDB instead of PostgreSQL
 
+> **Status (2026-06-27): closed — experimental manifests removed.** The
+> `k8s/cockroachdb/` and `k8s/yugabytedb/` manifests this document refers to were
+> **deleted** from the tree as non-working (see the verdict below). This document
+> is retained as the **investigation record**; its "apply this manifest" references
+> are historical. PostgreSQL (`k8s/postgresql/`) is the only supported datastore.
+
 > **Question.** Earlier attempts to run Authentik on **CockroachDB** or **YugabyteDB** (instead of
 > PostgreSQL) failed — the documented blocker being that Authentik's Django migrations require
 > PostgreSQL advisory locks (`pg_advisory_lock()`), which CockroachDB does not implement. *Are
