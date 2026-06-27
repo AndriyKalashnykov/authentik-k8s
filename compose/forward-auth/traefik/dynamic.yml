@@ -5,13 +5,16 @@ http:
   middlewares:
     # The Authentik forwardAuth middleware. Traefik calls this endpoint for every
     # request to a protected router; Authentik replies 2xx (allow, with identity
-    # headers) or 302 (redirect to login). `trustForwardHeader` is intentionally
-    # NOT set — it is deprecated since Traefik v3.6.14; the websecure entrypoint's
-    # `forwardedHeaders.insecure=true` (set in the compose command) is the modern
-    # replacement that lets Authentik reconstruct the original request URL.
+    # headers) or 302 (redirect to login). `trustForwardHeader: true` makes Traefik
+    # pass the original request's X-Forwarded-Host/Proto/Uri to the outpost so
+    # Authentik builds the login redirect against the real host instead of falling
+    # back to `http://localhost`. (The entrypoint `forwardedHeaders.insecure` only
+    # governs trusting X-Forwarded-* from the client; it does NOT forward them to
+    # the auth server — these are independent.)
     authentik:
       forwardAuth:
         address: http://server:9000/outpost.goauthentik.io/auth/traefik
+        trustForwardHeader: true
         authResponseHeaders:
           - X-authentik-username
           - X-authentik-groups

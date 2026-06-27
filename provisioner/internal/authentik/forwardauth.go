@@ -30,6 +30,16 @@ type ForwardAuthConfig struct {
 	Mode string
 	// CookieDomain is the domain the auth cookie is scoped to (forward_domain mode only).
 	CookieDomain string
+	// AuthentikHost is the BROWSER-reachable Authentik URL the embedded outpost
+	// redirects unauthenticated users to (its login flow). It is set on the
+	// embedded outpost's config; without it the outpost falls back to
+	// "http://localhost" and the browser hits a 404. Must be reachable BOTH from
+	// the user's browser AND from inside the server container (the embedded
+	// outpost runs in-process), e.g. https://127.0.0.1:9443 for the Compose stack.
+	AuthentikHost string
+	// AuthentikHostInsecure skips TLS verification when the outpost talks to
+	// AuthentikHost (needed for the self-signed dev cert).
+	AuthentikHostInsecure bool
 	// AuthorizationFlowSlug / InvalidationFlowSlug are resolved to PKs at runtime
 	// (never transcribe flow PKs — they differ per instance).
 	AuthorizationFlowSlug string
@@ -152,17 +162,37 @@ func FindEmbeddedOutpost(ctx context.Context, apiClient *api.APIClient) (*api.Ou
 	return nil, fmt.Errorf("embedded outpost (managed %q) not found", EmbeddedOutpostManaged)
 }
 
-// BindProviderToOutpost ensures providerPK is in the outpost's provider list
-// (idempotent — a no-op if already bound).
-func BindProviderToOutpost(ctx context.Context, apiClient *api.APIClient, outpost *api.Outpost, providerPK int32) (*http.Response, error) {
-	if slices.Contains(outpost.Providers, providerPK) {
-		return nil, nil // already bound
+// ConfigureEmbeddedOutpost ensures providerPK is bound to the outpost AND that
+// the outpost's config carries a browser-reachable `authentik_host` (so the
+// login redirect targets a real host instead of `http://localhost`). Idempotent:
+// a no-op when the provider is already bound and authentik_host already matches.
+func ConfigureEmbeddedOutpost(ctx context.Context, apiClient *api.APIClient, outpost *api.Outpost, providerPK int32, cfg ForwardAuthConfig) (*http.Response, error) {
+	bound := slices.Contains(outpost.Providers, providerPK)
+	config := outpost.Config
+	if config == nil {
+		config = map[string]any{}
 	}
-	providers := append(append([]int32{}, outpost.Providers...), providerPK)
+	hostOK := cfg.AuthentikHost == "" ||
+		(config["authentik_host"] == cfg.AuthentikHost &&
+			config["authentik_host_insecure"] == cfg.AuthentikHostInsecure)
+	if bound && hostOK {
+		return nil, nil // nothing to change
+	}
+
+	providers := outpost.Providers
+	if !bound {
+		providers = append(append([]int32{}, outpost.Providers...), providerPK)
+	}
+	req := api.PatchedOutpostRequest{Providers: providers}
+	if cfg.AuthentikHost != "" {
+		config["authentik_host"] = cfg.AuthentikHost
+		config["authentik_host_insecure"] = cfg.AuthentikHostInsecure
+		req.Config = config
+	}
 	_, resp, err := apiClient.OutpostsAPI.OutpostsInstancesPartialUpdate(ctx, outpost.Pk).
-		PatchedOutpostRequest(api.PatchedOutpostRequest{Providers: providers}).Execute()
+		PatchedOutpostRequest(req).Execute()
 	if err != nil {
-		return resp, fmt.Errorf("binding provider %d to outpost %q: %w", providerPK, outpost.Pk, err)
+		return resp, fmt.Errorf("configuring embedded outpost %q (provider %d): %w", outpost.Pk, providerPK, err)
 	}
 	return resp, nil
 }
@@ -196,7 +226,7 @@ func SetupForwardAuth(ctx context.Context, apiClient *api.APIClient, cfg Forward
 	if err != nil {
 		return err
 	}
-	if _, err := BindProviderToOutpost(ctx, apiClient, outpost, providerPK); err != nil {
+	if _, err := ConfigureEmbeddedOutpost(ctx, apiClient, outpost, providerPK, cfg); err != nil {
 		return err
 	}
 	return nil

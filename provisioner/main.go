@@ -39,6 +39,10 @@ const (
 	defaultFwdExternalHost     = "https://whoami.127-0-0-1.sslip.io"
 	defaultFwdMode             = "forward_single" // single whoami app; forward_domain for SSO
 	defaultFwdCookieDomain     = "127-0-0-1.sslip.io"
+	// Browser-reachable Authentik URL the embedded outpost redirects unauth users
+	// to. Must resolve from the browser AND from inside the server container
+	// (the embedded outpost is in-process). For Compose, 127.0.0.1:9443 is both.
+	defaultFwdAuthentikHost = "https://127.0.0.1:9443"
 	defaultFwdAuthzFlow        = "default-provider-authorization-implicit-consent"
 	defaultFwdInvalidationFlow = "default-provider-invalidation-flow"
 )
@@ -216,6 +220,8 @@ func main() {
 			ExternalHost:          env("AUTHENTIK_FORWARD_AUTH_EXTERNAL_HOST", defaultFwdExternalHost),
 			Mode:                  env("AUTHENTIK_FORWARD_AUTH_MODE", defaultFwdMode),
 			CookieDomain:          env("AUTHENTIK_FORWARD_AUTH_COOKIE_DOMAIN", defaultFwdCookieDomain),
+			AuthentikHost:         env("AUTHENTIK_FORWARD_AUTH_HOST", defaultFwdAuthentikHost),
+			AuthentikHostInsecure: env("AUTHENTIK_FORWARD_AUTH_HOST_INSECURE", "true") == "true",
 			AuthorizationFlowSlug: env("AUTHENTIK_FORWARD_AUTH_AUTHZ_FLOW", defaultFwdAuthzFlow),
 			InvalidationFlowSlug:  env("AUTHENTIK_FORWARD_AUTH_INVALIDATION_FLOW", defaultFwdInvalidationFlow),
 		}
