@@ -126,30 +126,27 @@ For each demo org — `org-01` and `org-02` — and for both an admin and a regu
 3. overwrites the token with a known key,
 4. re-authenticates **as that user** with the token and reads back its group membership.
 
-The resulting structure (org → group → user + API token):
+The resulting structure — a tree of org → group → user (+ API token), built per org `org-01` then `org-02`:
 
 ```mermaid
 flowchart TD
-    subgraph ORG1["org-01 — path orgs/org-01"]
-        G1A["group: org-01-admins<br/>(superuser)"]
-        G1U["group: org-01-users"]
-        U1A["user: org-01-admin<br/>token: org-01-admin-token"]
-        U1U["user: org-01-user<br/>token: org-01-user-token"]
-        G1A --> U1A
-        G1U --> U1U
-    end
-    subgraph ORG2["org-02 — path orgs/org-02"]
-        G2A["group: org-02-admins<br/>(superuser)"]
-        G2U["group: org-02-users"]
-        U2A["user: org-02-admin<br/>token: org-02-admin-token"]
-        U2U["user: org-02-user<br/>token: org-02-user-token"]
-        G2A --> U2A
-        G2U --> U2U
-    end
+    ROOT(["Authentik<br/>provisioned via the Go client"])
+    ROOT --> O1["org-01<br/>path: orgs/org-01"]
+    ROOT --> O2["org-02<br/>path: orgs/org-02"]
+    O1 --> O1A["group: org-01-admins<br/>(superuser)"]
+    O1 --> O1U["group: org-01-users"]
+    O1A --> O1AU["user: org-01-admin<br/>token: org-01-admin-token"]
+    O1U --> O1UU["user: org-01-user<br/>token: org-01-user-token"]
+    O2 --> O2A["group: org-02-admins<br/>(superuser)"]
+    O2 --> O2U["group: org-02-users"]
+    O2A --> O2AU["user: org-02-admin<br/>token: org-02-admin-token"]
+    O2U --> O2UU["user: org-02-user<br/>token: org-02-user-token"]
+    classDef org fill:#fff3e0,stroke:#ef6c00,color:#e65100;
     classDef grp fill:#e8f5e9,stroke:#2e7d32,color:#1b5e20;
     classDef usr fill:#e3f2fd,stroke:#1565c0,color:#0d47a1;
-    class G1A,G1U,G2A,G2U grp;
-    class U1A,U1U,U2A,U2U usr;
+    class O1,O2 org;
+    class O1A,O1U,O2A,O2U grp;
+    class O1AU,O1UU,O2AU,O2UU usr;
 ```
 
 The flow the POC runs against the API for each pair:
