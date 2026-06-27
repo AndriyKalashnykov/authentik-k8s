@@ -219,7 +219,8 @@ make compose-forward-auth-up     # Authentik + Traefik + whoami, then configure 
 #   -> after login, whoami echoes the X-authentik-* identity headers
 make compose-forward-auth-down   # tear it down (removes volumes)
 
-make e2e-forward-auth            # automated: up -> configure -> follow the redirect -> assert the Authentik login is reachable -> down
+make e2e-forward-auth            # fast: up -> configure -> follow the redirect -> assert the Authentik login is reachable -> down
+make e2e-forward-auth-browser    # full: a real headless browser signs in -> asserts whoami serves the X-authentik-* identity headers (Playwright)
 ```
 
 The provisioner wiring is opt-in via `AUTHENTIK_FORWARD_AUTH_ENABLED=true` (off by
@@ -278,7 +279,8 @@ Run `make help` for the full list. Common targets:
 | `make image-scan` | Build the image and scan it for HIGH/CRITICAL CVEs (Trivy) |
 | `make compose-up` / `make compose-down` | Start / stop the Authentik Compose stack |
 | `make compose-forward-auth-up` / `make compose-forward-auth-down` | Start / stop the Traefik + whoami forward-auth demo |
-| `make e2e-forward-auth` | E2E: configure forward-auth, assert an unauth request is intercepted (302) |
+| `make e2e-forward-auth` | E2E (fast): configure forward-auth, follow the redirect, assert the Authentik login is reachable |
+| `make e2e-forward-auth-browser` | E2E (full): a real headless browser completes the login and asserts whoami serves the identity headers (Playwright) |
 | `make kind-up` / `make kind-down` | Create+deploy / destroy the KinD cluster |
 | `make k8s-generate` | Regenerate `k8s/postgresql/` from the pinned Authentik chart + `values.yml` |
 | `make e2e-compose` / `make e2e` | End-to-end against Compose / KinD |

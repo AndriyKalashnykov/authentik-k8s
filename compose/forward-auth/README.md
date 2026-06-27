@@ -22,7 +22,8 @@ From `provisioner/`:
 make compose-forward-auth-up     # base stack + traefik + whoami, then configure forward-auth
 # browse https://whoami.127-0-0-1.sslip.io  (accept the self-signed cert)
 make compose-forward-auth-down   # tear down + remove volumes
-make e2e-forward-auth            # up -> configure -> follow the redirect -> assert the Authentik login is reachable (HTTP 200) -> down
+make e2e-forward-auth            # fast: up -> configure -> follow the redirect -> assert the Authentik login is reachable (HTTP 200) -> down
+make e2e-forward-auth-browser    # full: a real headless browser signs in -> asserts whoami serves the X-authentik-* identity headers (Playwright, ../../e2e/browser)
 ```
 
 `make compose-forward-auth-up` runs the provisioner with

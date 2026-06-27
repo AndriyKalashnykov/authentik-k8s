@@ -1,0 +1,12 @@
+{
+  "name": "authentik-forward-auth-browser-e2e",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Playwright full-login e2e for the Authentik forward-auth demo (real browser: whoami -> Authentik login -> whoami with identity headers).",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.61.1"
+  }
+}
