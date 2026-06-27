@@ -3,7 +3,14 @@
 Screenshots of the Authentik admin interface after the provisioner has created
 the demo `org-01` / `org-02` groups, users, and API tokens.
 
-Log in to the Authentik admin interface with `akadmin` / `Authentik01234567890!`.
+Log in as `akadmin` (Authentik's default bootstrap admin). The password is the
+`AUTHENTIK_BOOTSTRAP_PASSWORD` value in [`../compose/.env.example`](../compose/.env.example)
+— the single source of truth (for the KinD deployment it's the same key in
+`../k8s/postgresql/authentik-postgresql.yml`). Read it with:
+
+```bash
+grep AUTHENTIK_BOOTSTRAP_PASSWORD compose/.env.example
+```
 
 - **Docker Compose:** `https://localhost:9443/if/admin/`
 - **Kubernetes:** `https://<LB-IP>:443/if/admin/` (get the IP via `kubectl get svc authentik-server -o jsonpath='{.status.loadBalancer.ingress[0].ip}'`)

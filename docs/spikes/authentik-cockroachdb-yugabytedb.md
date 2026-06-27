@@ -217,6 +217,31 @@ version-specific regression a point release fixes. YugabyteDB remains **experime
 the next revisit should target a YugabyteDB release that materially changes DDL-transaction retry
 semantics (or an Authentik that tolerates non-PostgreSQL transaction models), not merely a newer patch.
 
+### 6c. Deep spike — exhausting every documented mitigation on 2025.2.4.0 (2026-06-27)
+
+Before closing the YugabyteDB door, every documented mitigation was tried against the
+**latest** image (`:latest` = `2025.2.4.0-b122`, confirmed — no newer stable or preview
+line exists). Two parallel primary-source research passes mapped the root cause; the
+verdicts were gated on **DB state** (migration count + `authentik_core_group` existence),
+not log banners (an earlier harness false-passed on the pre-migration `Booting authentik`
+line — see `common/testing.md`).
+
+| Mitigation tried | Result | Why |
+|------------------|--------|-----|
+| `ysql_output_buffer_size=128MB` + `yb_max_query_layer_retries=120` | ❌ FAIL at ~16 migrations (`YB001`) | **Red herring.** The buffer governs *single-statement* read-restart retries; the failure is a *multi-statement* DDL+DML atomic txn aborted by conflict, where retry is impossible because an earlier statement already returned rows ([yugabyte#22949](https://github.com/yugabyte/yugabyte-db/issues/22949)). |
+| `ysql_yb_ddl_transaction_block_enabled=true` (preview) alone | ❌ FAIL at ~2 migrations | New error surfaces earlier: `FeatureNotSupported: interleaving SAVEPOINT & DDL in transaction disallowed without DDL savepoint support` — Django's migration executor uses savepoints, which the preview transactional-DDL mode forbids. |
+| **BOTH** preview flags: `ysql_yb_ddl_transaction_block_enabled=true` + `ysql_yb_enable_ddl_savepoint_support=true` | ⚠️ Furthest ever — reaches **47 migrations** and creates `authentik_core_group` (past the wall that killed every prior run), then **HANGS** at ~migration 48 (`authentik_providers_saml`) for >11 min with no progress and no error | An effective deadlock in the stacked preview transactional-DDL + DDL-savepoint path. |
+
+**Conclusion:** even the latest YugabyteDB plus *every* documented mitigation — including
+stacking **two tech-preview** gflags — does not produce a working Authentik install; the
+best case advances further but deadlocks mid-migration. A backend that requires stacking
+tech-preview features (explicitly not production-ready, with documented concurrent-DDL
+conflict + weaker-isolation caveats) and still hangs is **not viable**. The official
+`django-yugabytedb` backend is also moot here — its latest release targets Django 3.2/4.0,
+while Authentik 2026.5 runs Django 5.x. The verdict stands: **PostgreSQL remains the only
+supported datastore**; revisit only when YugabyteDB GAs transactional DDL *with* savepoint
+support and Postgres-equivalent DDL isolation — not on a patch/minor bump.
+
 ## 7. Recommendation for this repo
 
 | Action | Recommendation |
