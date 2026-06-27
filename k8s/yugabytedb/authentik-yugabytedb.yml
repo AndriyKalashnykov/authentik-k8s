@@ -6,14 +6,17 @@
 # YugabyteDB now that v2025.1+ ships session pg_advisory_lock() (the function
 # CockroachDB still lacks). See docs/spikes/authentik-cockroachdb-yugabytedb.md.
 #
-# EMPIRICAL RESULT (YugabyteDB 2025.1.4.0, Authentik 2026.5, verified on KinD):
+# EMPIRICAL RESULT (YugabyteDB 2025.1.4.0 on KinD AND 2025.2.4.0 re-test
+# 2026-06-27, both with Authentik 2026.5):
 #   * Advisory locks WORK — pg_try_advisory_lock() returns true and Authentik's
 #     migration lock acquires/releases cleanly (the ORIGINAL blocker is fixed).
 #   * BUT Authentik's Django migrations do NOT complete: they abort with
 #     YugabyteDB transaction-conflict errors (YB001 "transaction expired or
-#     aborted") partway through (~around authentik_blueprints.0001_initial),
+#     aborted ... query layer retry isn't possible, READ COMMITTED transaction
+#     was aborted and some data was already sent to the user") partway through,
 #     EVEN with yb_enable_read_committed_isolation=true. This is a deeper
-#     DDL/migration-transaction incompatibility, independent of advisory locks.
+#     DDL/migration-transaction incompatibility, independent of advisory locks,
+#     and is UNCHANGED across the 2025.1 -> 2025.2 minor bump (see spike §6b).
 #
 # => Authentik does NOT install cleanly on YugabyteDB yet. PostgreSQL
 #    (k8s/postgresql/) remains the supported datastore. Apply this manifest
@@ -780,7 +783,7 @@ spec:
       # renovate: datasource=docker depName=yugabytedb/yugabyte
       containers:
         - name: yugabytedb
-          image: yugabytedb/yugabyte:2025.1.4.0-b103@sha256:be935be963ead918d3ba6497505f0b7adb203313ccad710c111f64f697452ede
+          image: yugabytedb/yugabyte:2025.2.4.0-b122@sha256:019459cf6aad5ecafcdd0ba173b736357b8d9a60ae68b993f182dee4e4d049be
           imagePullPolicy: IfNotPresent
           command:
             - bin/yugabyted
