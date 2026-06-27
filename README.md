@@ -196,6 +196,7 @@ Run `make help` for the full list. Common targets:
 | `make compose-lint` | Lint the Compose file with dclint (rules in `.dclintrc.yaml`) |
 | `make static-check` | Composite gate: alignment + lint + hadolint + mermaid + compose + vulncheck + trivy-fs + secrets |
 | `make image-build` / `make image-run` | Build / run the distroless container image |
+| `make image-scan` | Build the image and scan it for HIGH/CRITICAL CVEs (Trivy) |
 | `make compose-up` / `make compose-down` | Start / stop the Authentik Compose stack |
 | `make kind-up` / `make kind-down` | Create+deploy / destroy the KinD cluster |
 | `make e2e-compose` / `make e2e` | End-to-end against Compose / KinD |
@@ -204,7 +205,7 @@ Run `make help` for the full list. Common targets:
 
 - **Toolchain** — pinned in `provisioner/.mise.toml` (go 1.26.4, golangci-lint, govulncheck, hadolint, kind, kubectl); installed with `make deps`.
 - **Renovate** — `renovate.json` tracks every pinned version; validate with `make renovate-validate`.
-- **CI** — `.github/workflows/ci.yml` runs static-check + build + test. Reproduce locally with `make ci`.
+- **CI** — `.github/workflows/ci.yml` runs static-check + build + test + a `docker` job (image build + Trivy scan) + a live `e2e` job (Authentik via Compose). Reproduce the core gate locally with `make ci`.
 
 ## Web UI
 
