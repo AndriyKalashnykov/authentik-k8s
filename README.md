@@ -15,7 +15,7 @@ A proof-of-concept that drives [Authentik](https://goauthentik.io/) programmatic
 The repo has two halves:
 
 - **Deploy Authentik** — locally via Docker Compose (lightweight) or on a full Kubernetes cluster via KinD (with `cloud-provider-kind` for LoadBalancer support and OSS PostgreSQL + Valkey datastores).
-- **The Go POC** (`provisioner/`) — uses the Authentik Go client to provision a small demo org structure and verify it end-to-end against the running instance.
+- **`provisioner/`** — a Go program that provisions a demo org structure (groups, users, tokens) and verifies it end-to-end via the Authentik client.
 
 ```mermaid
 flowchart LR
