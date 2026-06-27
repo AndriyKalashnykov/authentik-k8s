@@ -1,0 +1,93 @@
+# OSS PostgreSQL datastore for the Authentik Helm chart (subcharts disabled).
+# Concatenated into k8s/postgresql/authentik-postgresql.yml by `make k8s-generate`.
+# The chart's bundled Bitnami postgresql was removed from Docker Hub; this is the
+# OSS postgres:18-alpine replacement. It reads POSTGRES_USER/PASSWORD/DB from the
+# chart-generated `authentik` Secret (AUTHENTIK_POSTGRESQL__*), so it stays in
+# sync with values.yml. PGDATA is an explicit subdir so postgres:18 (which moved
+# its default data dir to /var/lib/postgresql) works with the data mount.
+# NOTE: no Redis/Valkey — Authentik dropped Redis in 2025.10 (all PostgreSQL-backed).
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: authentik-postgresql
+  namespace: default
+  labels:
+    app.kubernetes.io/instance: authentik
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: primary
+spec:
+  type: ClusterIP
+  sessionAffinity: None
+  ports:
+  - name: tcp-postgresql
+    port: 5432
+    targetPort: tcp-postgresql
+    nodePort: null
+  selector:
+    app.kubernetes.io/instance: authentik
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: primary
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authentik-postgresql
+  namespace: default
+  labels:
+    app.kubernetes.io/instance: authentik
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: primary
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: authentik
+      app.kubernetes.io/name: postgresql
+      app.kubernetes.io/component: primary
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: authentik
+        app.kubernetes.io/name: postgresql
+        app.kubernetes.io/component: primary
+    spec:
+      containers:
+      - name: postgresql
+        image: postgres:18-alpine@sha256:1b1689b20d16a014a3d195653381cf2caa75a41a92d93b255a9d6ea29fd353aa
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: authentik
+              key: AUTHENTIK_POSTGRESQL__USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: authentik
+              key: AUTHENTIK_POSTGRESQL__PASSWORD
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: authentik
+              key: AUTHENTIK_POSTGRESQL__NAME
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        ports:
+        - name: tcp-postgresql
+          containerPort: 5432
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql/data
+      volumes:
+      - name: data
+        emptyDir: {}

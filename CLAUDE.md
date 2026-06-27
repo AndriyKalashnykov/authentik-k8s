@@ -20,7 +20,7 @@ The Go POC and the deployment are decoupled: you stand up Authentik first (compo
   - `internal/util/utils.go` — TLS transport (skips verify), pointer helpers (`*bool`, `*int32`, `*string` — the client takes pointers for optional fields).
   - `Dockerfile` — multi-stage, static binary on distroless-nonroot; a one-shot job (no port/healthcheck), config supplied via env at runtime (`make image-build` / `image-run`).
   - `.env.example` — committed source of truth for the POC's env vars; copy to `.env` (gitignored). `e2e_test.go` is the build-tagged (`//go:build e2e`) live test driven by `make e2e-compose` / `make e2e`.
-- `k8s/postgresql/` — Authentik manifests (PostgreSQL backend), pre-generated via `helm template`, plus the `values.yml` used to generate them.
+- `k8s/postgresql/` — Authentik manifests (PostgreSQL backend). **Generated** by `make k8s-generate` from the pinned Authentik Helm chart (`AUTHENTIK_CHART_VERSION` in the Makefile) + `values.yml` (Bitnami subcharts disabled), concatenated with `oss-datastores.yml` (the OSS `postgres:18-alpine` workload), with Helm metadata labels stripped. A CI `k8s-drift` job (`make k8s-generate-check`) fails if the committed manifest is stale. No Redis/Valkey — Authentik 2026.5 is PostgreSQL-only.
 - `k8s/kind-config.yaml` — single-node KinD cluster config used by `make e2e`.
 - `compose/` — Docker Compose stack (Authentik server + worker + PostgreSQL; **no Redis** — Authentik dropped the Redis dependency in 2025.10, everything is PostgreSQL-backed now). `compose/.env.example` is the committed source of truth; `compose/.env` is gitignored. Linted by `make compose-lint` (dclint; rule config in `.dclintrc.yaml`).
 - `docs/` — `web-ui.md` (admin-UI screenshots + how to regenerate them) and `spikes/` (the CockroachDB/YugabyteDB datastore investigation — manifests since removed as non-working; PostgreSQL is the only backend). Screenshots live in `docs/img/`.
@@ -52,9 +52,9 @@ make compose-up / compose-down  # bring the Compose Authentik stack up / tear it
 
 make renovate-validate          # validate renovate.json
 
-# --- Regenerate the k8s manifests from the Helm chart ---
-helm repo add authentik https://charts.goauthentik.io && helm repo update
-helm template authentik authentik/authentik -f ./k8s/postgresql/values.yml > ./k8s/postgresql/authentik-postgresql.yml
+# --- Regenerate the k8s manifest from the pinned Authentik Helm chart ---
+make -C provisioner k8s-generate        # helm template (subcharts off) + oss-datastores.yml + strip Helm labels
+make -C provisioner k8s-generate-check  # drift gate: fail if the committed manifest is stale vs chart+values
 ```
 
 Default admin login — **username** `akadmin` (Authentik's fixed bootstrap user;
@@ -98,7 +98,7 @@ cp compose/.env.example  compose/.env    # Compose stack: PG_*, AUTHENTIK_SECRET
 
 - **POC flow** (`CreateGroupsAndUsers`, called 4× for org-01/org-02 × admin/user): create group → create user in group → set password → create API token → retrieve the Authentik-generated key → overwrite it with a known key → re-create an API client *as that user* with the known token → call `MeRetrieveUser` to read the user's groups. The final step demonstrates a non-privileged token can read its own group membership.
 
-- **Manifests are committed artifacts generated from `values.yml`** — but with **two intentional hand-edits**: (1) the `AUTHENTIK_BOOTSTRAP_PASSWORD`/`AUTHENTIK_BOOTSTRAP_TOKEN` env on server+worker; (2) the PostgreSQL and Redis workloads were swapped from the chart's **Bitnami subchart images (removed from Docker Hub in 2025)** to **OSS Deployments** — `postgres:18-alpine` and `valkey/valkey:9-alpine` (Valkey = the BSD/Linux-Foundation Redis fork). The postgres Deployment sets `PGDATA=/var/lib/postgresql/data/pgdata` (an explicit subdir), which keeps the postgres:18+ image — whose default data dir relocated to `/var/lib/postgresql` — working with the existing `/var/lib/postgresql/data` mount (the compose stack, which has no explicit `PGDATA`, instead mounts the volume at `/var/lib/postgresql`). They keep the original Service selectors/ports and read DB creds from the `authentik` Secret, so `authentik-server` connects unchanged. **Regenerating from the chart reintroduces Bitnami** — re-apply the OSS swap after any `helm template` (or disable the chart's bundled `postgresql`/`redis` and point Authentik at the OSS workloads). A few now-unused Bitnami `ConfigMap`s (redis-scripts/health/config, pg-extended-config) remain as harmless dead config.
+- **The k8s manifest is GENERATED, not hand-edited** — `make k8s-generate` (don't edit `k8s/postgresql/authentik-postgresql.yml` by hand; the `k8s-drift` CI gate will fail). It renders the pinned Authentik Helm chart with the bundled **Bitnami `postgresql` subchart disabled** (the Bitnami image was removed from Docker Hub) + `values.yml` (external DB host, `secret_key`, the `AUTHENTIK_BOOTSTRAP_PASSWORD`/`TOKEN` env on server+worker), strips the Helm metadata labels, and concatenates `oss-datastores.yml` — the OSS `postgres:18-alpine` Deployment+Service. The postgres Deployment reads creds from the chart-generated `authentik` Secret (`AUTHENTIK_POSTGRESQL__*`), so it stays in sync with `values.yml`, and sets `PGDATA=/var/lib/postgresql/data/pgdata` (explicit subdir) so the postgres:18 image — whose default data dir moved to `/var/lib/postgresql` — works with the `/var/lib/postgresql/data` mount (the compose stack, no explicit `PGDATA`, mounts the volume at `/var/lib/postgresql`). **No Redis/Valkey** — Authentik dropped Redis in 2025.10 (cache, task broker, and WebSocket channels are all PostgreSQL-backed). To change the deployment, edit `values.yml` / `oss-datastores.yml` and re-run `make k8s-generate`.
 
 - **Namespace is `default` end-to-end.** Every resource in `k8s/postgresql/authentik-postgresql.yml` is pinned to `namespace: "default"`, and the `provisioner/` Makefile deploy path (`kind-deploy`) uses `AUTHENTIK_NS := default` — they match. (A former standalone `deploy-authentik-k8s.sh` that patched/waited against `-n threeport-api` was removed; the Makefile is the only deploy path now.)
 
@@ -128,7 +128,7 @@ When spawning subagents to work on any of the above, always pass the relevant sk
 
 ## Upgrade Backlog
 
-Deferred / monitor items from `/upgrade-analysis` (2026-06-26). The repo is otherwise fully current — Go 1.26.4, all mise tools at latest, Authentik 2026.5, postgres 18 / valkey 9, kubectl 1.36.2 / kind 0.32 / node v1.36.1 (aligned), cloud-provider-kind 0.11.1, all Action SHAs at current major tags; `govulncheck` clean; Renovate alive (automerge on, no Errored branches).
+Deferred / monitor items from `/upgrade-analysis` (2026-06-26). The repo is otherwise fully current — Go 1.26.4, all mise tools at latest, Authentik 2026.5, postgres 18, kubectl 1.36.2 / kind 0.32 / node v1.36.1 (aligned), cloud-provider-kind 0.11.1, all Action SHAs at current major tags; `govulncheck` clean; Renovate alive (automerge on, no Errored branches).
 
 - [ ] **Alternative datastores (CockroachDB / YugabyteDB) — closed, not deferred.** Both were evaluated and removed as non-working (CockroachDB lacks session `pg_advisory_lock()` — [cockroachdb#169981](https://github.com/cockroachdb/cockroach/issues/169981), open; YugabyteDB aborts Authentik's migrations on `YB001` even with every documented mitigation). Full investigation retained in `docs/spikes/authentik-cockroachdb-yugabytedb.md`. PostgreSQL is the only supported backend; no revisit planned unless that analysis's "revisit when…" conditions are met.
 - [ ] **Renovate `lock-file-maintenance`** is in "Awaiting Schedule" (working as designed — periodic `go.sum` refresh); no action needed.

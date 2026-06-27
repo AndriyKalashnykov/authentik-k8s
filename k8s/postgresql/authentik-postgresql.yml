@@ -1,15 +1,4 @@
 ---
-# Source: authentik/charts/redis/templates/serviceaccount.yaml
-apiVersion: v1
-kind: ServiceAccount
-automountServiceAccountToken: true
-metadata:
-  name: authentik-redis
-  namespace: "default"
-  labels:
-    app.kubernetes.io/instance: authentik
-    app.kubernetes.io/name: redis
----
 # Source: authentik/charts/serviceAccount/templates/serviceaccount.yaml
 apiVersion: v1
 kind: ServiceAccount
@@ -20,21 +9,7 @@ metadata:
     app.kubernetes.io/name: "serviceAccount"
     app.kubernetes.io/instance: "authentik"
     app.kubernetes.io/part-of: "authentik"
----
-# Source: authentik/charts/postgresql/templates/secrets.yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: authentik-postgresql
-  namespace: "default"
-  labels:
-    app.kubernetes.io/instance: authentik
-    app.kubernetes.io/name: postgresql
-type: Opaque
-data:
-  postgres-password: "cWQ4MGE2QnhqRA=="
-  password: "bXUyVktzWllSdQ=="
-  # We don't auto-generate LDAP password when it's not provided as we do for other passwords
+
 ---
 # Source: authentik/templates/secret.yaml
 apiVersion: v1
@@ -51,6 +26,7 @@ data:
   AUTHENTIK_EMAIL__TIMEOUT: "MzA="
   AUTHENTIK_EMAIL__USE_SSL: "ZmFsc2U="
   AUTHENTIK_EMAIL__USE_TLS: "ZmFsc2U="
+  AUTHENTIK_ENABLED: "dHJ1ZQ=="
   AUTHENTIK_ERROR_REPORTING__ENABLED: "ZmFsc2U="
   AUTHENTIK_ERROR_REPORTING__ENVIRONMENT: "azhz"
   AUTHENTIK_ERROR_REPORTING__SEND_PII: "ZmFsc2U="
@@ -63,183 +39,9 @@ data:
   AUTHENTIK_POSTGRESQL__PASSWORD: "VGhpc0lzTm90QVNlY3VyZVBhc3N3b3Jk"
   AUTHENTIK_POSTGRESQL__PORT: "NTQzMg=="
   AUTHENTIK_POSTGRESQL__USER: "YXV0aGVudGlr"
-  AUTHENTIK_REDIS__HOST: "YXV0aGVudGlrLXJlZGlzLW1hc3Rlcg=="
   AUTHENTIK_SECRET_KEY: "UGxlYXNlR2VuZXJhdGVBNTBDaGFyS2V5"
----
-# Source: authentik/charts/postgresql/templates/primary/extended-configmap.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: authentik-postgresql-extended-configuration
-  namespace: "default"
-  labels:
-    app.kubernetes.io/instance: authentik
-    app.kubernetes.io/name: postgresql
-    app.kubernetes.io/component: primary
-data:
-  override.conf: |-
-    max_connections = 500
----
-# Source: authentik/charts/redis/templates/configmap.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: authentik-redis-configuration
-  namespace: "default"
-  labels:
-    app.kubernetes.io/instance: authentik
-    app.kubernetes.io/name: redis
-data:
-  redis.conf: |-
-    # User-supplied common configuration:
-    # Enable AOF https://redis.io/topics/persistence#append-only-file
-    appendonly yes
-    # Disable RDB persistence, AOF persistence already enabled.
-    save ""
-    # End of common configuration
-  master.conf: |-
-    dir /data
-    # User-supplied master configuration:
-    rename-command FLUSHDB ""
-    rename-command FLUSHALL ""
-    # End of master configuration
-  replica.conf: |-
-    dir /data
-    # User-supplied replica configuration:
-    rename-command FLUSHDB ""
-    rename-command FLUSHALL ""
-    # End of replica configuration
----
-# Source: authentik/charts/redis/templates/health-configmap.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: authentik-redis-health
-  namespace: "default"
-  labels:
-    app.kubernetes.io/instance: authentik
-    app.kubernetes.io/name: redis
-data:
-  ping_readiness_local.sh: |-
-    #!/bin/bash
+  AUTHENTIK_WEB__PATH: "Lw=="
 
-    [[ -f $REDIS_PASSWORD_FILE ]] && export REDIS_PASSWORD="$(< "${REDIS_PASSWORD_FILE}")"
-    [[ -n "$REDIS_PASSWORD" ]] && export REDISCLI_AUTH="$REDIS_PASSWORD"
-    response=$(
-      timeout -s 15 $1 \
-      redis-cli \
-        -h localhost \
-        -p $REDIS_PORT \
-        ping
-    )
-    if [ "$?" -eq "124" ]; then
-      echo "Timed out"
-      exit 1
-    fi
-    if [ "$response" != "PONG" ]; then
-      echo "$response"
-      exit 1
-    fi
-  ping_liveness_local.sh: |-
-    #!/bin/bash
-
-    [[ -f $REDIS_PASSWORD_FILE ]] && export REDIS_PASSWORD="$(< "${REDIS_PASSWORD_FILE}")"
-    [[ -n "$REDIS_PASSWORD" ]] && export REDISCLI_AUTH="$REDIS_PASSWORD"
-    response=$(
-      timeout -s 15 $1 \
-      redis-cli \
-        -h localhost \
-        -p $REDIS_PORT \
-        ping
-    )
-    if [ "$?" -eq "124" ]; then
-      echo "Timed out"
-      exit 1
-    fi
-    responseFirstWord=$(echo $response | head -n1 | awk '{print $1;}')
-    if [ "$response" != "PONG" ] && [ "$responseFirstWord" != "LOADING" ] && [ "$responseFirstWord" != "MASTERDOWN" ]; then
-      echo "$response"
-      exit 1
-    fi
-  ping_readiness_master.sh: |-
-    #!/bin/bash
-
-    [[ -f $REDIS_MASTER_PASSWORD_FILE ]] && export REDIS_MASTER_PASSWORD="$(< "${REDIS_MASTER_PASSWORD_FILE}")"
-    [[ -n "$REDIS_MASTER_PASSWORD" ]] && export REDISCLI_AUTH="$REDIS_MASTER_PASSWORD"
-    response=$(
-      timeout -s 15 $1 \
-      redis-cli \
-        -h $REDIS_MASTER_HOST \
-        -p $REDIS_MASTER_PORT_NUMBER \
-        ping
-    )
-    if [ "$?" -eq "124" ]; then
-      echo "Timed out"
-      exit 1
-    fi
-    if [ "$response" != "PONG" ]; then
-      echo "$response"
-      exit 1
-    fi
-  ping_liveness_master.sh: |-
-    #!/bin/bash
-
-    [[ -f $REDIS_MASTER_PASSWORD_FILE ]] && export REDIS_MASTER_PASSWORD="$(< "${REDIS_MASTER_PASSWORD_FILE}")"
-    [[ -n "$REDIS_MASTER_PASSWORD" ]] && export REDISCLI_AUTH="$REDIS_MASTER_PASSWORD"
-    response=$(
-      timeout -s 15 $1 \
-      redis-cli \
-        -h $REDIS_MASTER_HOST \
-        -p $REDIS_MASTER_PORT_NUMBER \
-        ping
-    )
-    if [ "$?" -eq "124" ]; then
-      echo "Timed out"
-      exit 1
-    fi
-    responseFirstWord=$(echo $response | head -n1 | awk '{print $1;}')
-    if [ "$response" != "PONG" ] && [ "$responseFirstWord" != "LOADING" ]; then
-      echo "$response"
-      exit 1
-    fi
-  ping_readiness_local_and_master.sh: |-
-    script_dir="$(dirname "$0")"
-    exit_status=0
-    "$script_dir/ping_readiness_local.sh" $1 || exit_status=$?
-    "$script_dir/ping_readiness_master.sh" $1 || exit_status=$?
-    exit $exit_status
-  ping_liveness_local_and_master.sh: |-
-    script_dir="$(dirname "$0")"
-    exit_status=0
-    "$script_dir/ping_liveness_local.sh" $1 || exit_status=$?
-    "$script_dir/ping_liveness_master.sh" $1 || exit_status=$?
-    exit $exit_status
----
-# Source: authentik/charts/redis/templates/scripts-configmap.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: authentik-redis-scripts
-  namespace: "default"
-  labels:
-    app.kubernetes.io/instance: authentik
-    app.kubernetes.io/name: redis
-data:
-  start-master.sh: |
-    #!/bin/bash
-
-    [[ -f $REDIS_PASSWORD_FILE ]] && export REDIS_PASSWORD="$(< "${REDIS_PASSWORD_FILE}")"
-    if [[ -f /opt/bitnami/redis/mounted-etc/master.conf ]];then
-        cp /opt/bitnami/redis/mounted-etc/master.conf /opt/bitnami/redis/etc/master.conf
-    fi
-    if [[ -f /opt/bitnami/redis/mounted-etc/redis.conf ]];then
-        cp /opt/bitnami/redis/mounted-etc/redis.conf /opt/bitnami/redis/etc/redis.conf
-    fi
-    ARGS=("--port" "${REDIS_PORT}")
-    ARGS+=("--protected-mode" "no")
-    ARGS+=("--include" "/opt/bitnami/redis/etc/redis.conf")
-    ARGS+=("--include" "/opt/bitnami/redis/etc/master.conf")
-    exec redis-server "${ARGS[@]}"
 ---
 # Source: authentik/charts/serviceAccount/templates/clusterrole.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -257,6 +59,7 @@ rules:
       - customresourcedefinitions
     verbs:
       - list
+
 ---
 # Source: authentik/charts/serviceAccount/templates/clusterrolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -275,6 +78,7 @@ subjects:
   - kind: ServiceAccount
     name: authentik
     namespace: "default"
+
 ---
 # Source: authentik/charts/serviceAccount/templates/role.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -333,6 +137,16 @@ rules:
       - list
       - patch
   - apiGroups:
+      - gateway.networking.k8s.io
+    resources:
+      - httproutes
+    verbs:
+      - get
+      - create
+      - delete
+      - list
+      - patch
+  - apiGroups:
       - monitoring.coreos.com
     resources:
       - servicemonitors
@@ -348,6 +162,7 @@ rules:
       - customresourcedefinitions
     verbs:
       - list
+
 ---
 # Source: authentik/charts/serviceAccount/templates/rolebinding.yaml
 apiVersion: rbac.authorization.k8s.io/v1
@@ -367,107 +182,7 @@ subjects:
   - kind: ServiceAccount
     name: authentik
     namespace: "default"
----
-# Source: authentik/charts/postgresql/templates/primary/svc-headless.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: authentik-postgresql-hl
-  namespace: "default"
-  labels:
-    app.kubernetes.io/instance: authentik
-    app.kubernetes.io/name: postgresql
-    app.kubernetes.io/component: primary
-  annotations:
-    # Use this annotation in addition to the actual publishNotReadyAddresses
-    # field below because the annotation will stop being respected soon but the
-    # field is broken in some versions of Kubernetes:
-    # https://github.com/kubernetes/kubernetes/issues/58662
-    service.alpha.kubernetes.io/tolerate-unready-endpoints: "true"
-spec:
-  type: ClusterIP
-  clusterIP: None
-  # We want all pods in the StatefulSet to have their addresses published for
-  # the sake of the other Postgresql pods even before they're ready, since they
-  # have to be able to talk to each other in order to become ready.
-  publishNotReadyAddresses: true
-  ports:
-    - name: tcp-postgresql
-      port: 5432
-      targetPort: tcp-postgresql
-  selector:
-    app.kubernetes.io/instance: authentik
-    app.kubernetes.io/name: postgresql
-    app.kubernetes.io/component: primary
----
-# Source: authentik/charts/postgresql/templates/primary/svc.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: authentik-postgresql
-  namespace: "default"
-  labels:
-    app.kubernetes.io/instance: authentik
-    app.kubernetes.io/name: postgresql
-    app.kubernetes.io/component: primary
-spec:
-  type: ClusterIP
-  sessionAffinity: None
-  ports:
-    - name: tcp-postgresql
-      port: 5432
-      targetPort: tcp-postgresql
-      nodePort: null
-  selector:
-    app.kubernetes.io/instance: authentik
-    app.kubernetes.io/name: postgresql
-    app.kubernetes.io/component: primary
----
-# Source: authentik/charts/redis/templates/headless-svc.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: authentik-redis-headless
-  namespace: "default"
-  labels:
-    app.kubernetes.io/instance: authentik
-    app.kubernetes.io/name: redis
-  annotations:
-    
-spec:
-  type: ClusterIP
-  clusterIP: None
-  ports:
-    - name: tcp-redis
-      port: 6379
-      targetPort: redis
-  selector:
-    app.kubernetes.io/instance: authentik
-    app.kubernetes.io/name: redis
----
-# Source: authentik/charts/redis/templates/master/service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: authentik-redis-master
-  namespace: "default"
-  labels:
-    app.kubernetes.io/instance: authentik
-    app.kubernetes.io/name: redis
-    app.kubernetes.io/component: master
-spec:
-  type: ClusterIP
-  internalTrafficPolicy: Cluster
-  sessionAffinity: None
-  ports:
-    - name: tcp-redis
-      port: 6379
-      targetPort: redis
-      nodePort: null
-  selector:
-    app.kubernetes.io/instance: authentik
-    app.kubernetes.io/name: redis
-    app.kubernetes.io/component: master
+
 ---
 # Source: authentik/templates/server/service.yaml
 apiVersion: v1
@@ -495,6 +210,7 @@ spec:
     app.kubernetes.io/name: "authentik"
     app.kubernetes.io/instance: "authentik"
     app.kubernetes.io/component: "server"
+
 ---
 # Source: authentik/templates/server/deployment.yaml
 apiVersion: apps/v1
@@ -523,26 +239,20 @@ spec:
         app.kubernetes.io/component: "server"
         app.kubernetes.io/part-of: "authentik"
       annotations:
-        checksum/secret: a2082ed4488b583f0e460f2f74a314a5e2c1e9ae17bef60ddd71214494f5eea9
+        checksum/secret: 9d5d293a6ea4da77ef3fc302b44e753e3483dc88e01e17245be1462da42830be
     spec:
       terminationGracePeriodSeconds: 30
       containers:
         - name: server
-          image: ghcr.io/goauthentik/server:2026.5
+          image: ghcr.io/goauthentik/server:2026.5.3
           imagePullPolicy: IfNotPresent
           args:
             - server
           env:
-            - name: AUTHENTIK_LISTEN__HTTP
-              value: "0.0.0.0:9000"
-            - name: AUTHENTIK_LISTEN__HTTPS
-              value: "0.0.0.0:9443"
-            - name: AUTHENTIK_LISTEN__METRICS
-              value: "0.0.0.0:9300"
             - name: AUTHENTIK_BOOTSTRAP_PASSWORD
-              value: "Authentik01234567890!"
+              value: Authentik01234567890!
             - name: AUTHENTIK_BOOTSTRAP_TOKEN
-              value: "NoMlxBQuYgfu3j19ygGqhjXenAjrJgOfN5naqmSDBUhdLjYqHKze7yyzY07H"  
+              value: NoMlxBQuYgfu3j19ygGqhjXenAjrJgOfN5naqmSDBUhdLjYqHKze7yyzY07H
           envFrom:
             - secretRef:
                 name: authentik
@@ -560,32 +270,32 @@ spec:
             
             failureThreshold: 3
             httpGet:
-              path: /-/health/live/
+              path: '/-/health/live/'
               port: http
             initialDelaySeconds: 5
             periodSeconds: 10
             successThreshold: 1
-            timeoutSeconds: 1
+            timeoutSeconds: 3
           readinessProbe:
             
             failureThreshold: 3
             httpGet:
-              path: /-/health/ready/
+              path: '/-/health/ready/'
               port: http
             initialDelaySeconds: 5
             periodSeconds: 10
             successThreshold: 1
-            timeoutSeconds: 1
+            timeoutSeconds: 3
           startupProbe:
             
             failureThreshold: 60
             httpGet:
-              path: /-/health/live/
+              path: '/-/health/live/'
               port: http
             initialDelaySeconds: 5
             periodSeconds: 10
             successThreshold: 1
-            timeoutSeconds: 1
+            timeoutSeconds: 3
           resources:
             {}
       affinity:
@@ -600,6 +310,7 @@ spec:
                     app.kubernetes.io/component: "server"
                 topologyKey: kubernetes.io/hostname
       enableServiceLinks: true
+
 ---
 # Source: authentik/templates/worker/deployment.yaml
 apiVersion: apps/v1
@@ -628,24 +339,31 @@ spec:
         app.kubernetes.io/component: "worker"
         app.kubernetes.io/part-of: "authentik"
       annotations:
-        checksum/secret: a2082ed4488b583f0e460f2f74a314a5e2c1e9ae17bef60ddd71214494f5eea9
+        checksum/secret: 9d5d293a6ea4da77ef3fc302b44e753e3483dc88e01e17245be1462da42830be
     spec:
       serviceAccountName: authentik
       terminationGracePeriodSeconds: 30
       containers:
         - name: worker
-          image: ghcr.io/goauthentik/server:2026.5
+          image: ghcr.io/goauthentik/server:2026.5.3
           imagePullPolicy: IfNotPresent
           args:
             - worker
           env:
             - name: AUTHENTIK_BOOTSTRAP_PASSWORD
-              value: "Authentik01234567890!"
+              value: Authentik01234567890!
             - name: AUTHENTIK_BOOTSTRAP_TOKEN
-              value: "NoMlxBQuYgfu3j19ygGqhjXenAjrJgOfN5naqmSDBUhdLjYqHKze7yyzY07H"  
+              value: NoMlxBQuYgfu3j19ygGqhjXenAjrJgOfN5naqmSDBUhdLjYqHKze7yyzY07H
           envFrom:
             - secretRef:
                 name: authentik
+          ports:
+            - name: http
+              containerPort: 9000
+              protocol: TCP
+            - name: metrics
+              containerPort: 9300
+              protocol: TCP
           livenessProbe:
             
             exec:
@@ -656,7 +374,7 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 10
             successThreshold: 1
-            timeoutSeconds: 1
+            timeoutSeconds: 3
           readinessProbe:
             
             exec:
@@ -667,7 +385,7 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 10
             successThreshold: 1
-            timeoutSeconds: 1
+            timeoutSeconds: 3
           startupProbe:
             
             exec:
@@ -678,7 +396,7 @@ spec:
             initialDelaySeconds: 30
             periodSeconds: 10
             successThreshold: 1
-            timeoutSeconds: 1
+            timeoutSeconds: 3
           resources:
             {}
       affinity:
@@ -693,17 +411,42 @@ spec:
                     app.kubernetes.io/component: "worker"
                 topologyKey: kubernetes.io/hostname
       enableServiceLinks: true
+# OSS PostgreSQL datastore for the Authentik Helm chart (subcharts disabled).
+# Concatenated into k8s/postgresql/authentik-postgresql.yml by `make k8s-generate`.
+# The chart's bundled Bitnami postgresql was removed from Docker Hub; this is the
+# OSS postgres:18-alpine replacement. It reads POSTGRES_USER/PASSWORD/DB from the
+# chart-generated `authentik` Secret (AUTHENTIK_POSTGRESQL__*), so it stays in
+# sync with values.yml. PGDATA is an explicit subdir so postgres:18 (which moved
+# its default data dir to /var/lib/postgresql) works with the data mount.
+# NOTE: no Redis/Valkey — Authentik dropped Redis in 2025.10 (all PostgreSQL-backed).
 ---
-# OSS PostgreSQL — replaces the removed Bitnami image (bitnami/postgresql tags
-# were purged from Docker Hub in 2025). Minimal single-replica Deployment for
-# the e2e/demo stack; pod labels match the existing authentik-postgresql
-# Service selector so authentik-server routes here unchanged. Connection params
-# (user/db/password) are read from the same `authentik` Secret the server uses.
+apiVersion: v1
+kind: Service
+metadata:
+  name: authentik-postgresql
+  namespace: default
+  labels:
+    app.kubernetes.io/instance: authentik
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: primary
+spec:
+  type: ClusterIP
+  sessionAffinity: None
+  ports:
+  - name: tcp-postgresql
+    port: 5432
+    targetPort: tcp-postgresql
+    nodePort: null
+  selector:
+    app.kubernetes.io/instance: authentik
+    app.kubernetes.io/name: postgresql
+    app.kubernetes.io/component: primary
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: authentik-postgresql
-  namespace: "default"
+  namespace: default
   labels:
     app.kubernetes.io/instance: authentik
     app.kubernetes.io/name: postgresql
@@ -723,82 +466,41 @@ spec:
         app.kubernetes.io/component: primary
     spec:
       containers:
-        - name: postgresql
-          # postgres:18+ relocated its default data dir, but the explicit
-          # PGDATA=/var/lib/postgresql/data/pgdata below keeps the 18 image
-          # happy with the existing mount (no volume-path change needed here,
-          # unlike the compose stack which has no explicit PGDATA).
-          image: postgres:18-alpine@sha256:1b1689b20d16a014a3d195653381cf2caa75a41a92d93b255a9d6ea29fd353aa
-          imagePullPolicy: IfNotPresent
-          env:
-            - name: POSTGRES_USER
-              valueFrom:
-                secretKeyRef:
-                  name: authentik
-                  key: AUTHENTIK_POSTGRESQL__USER
-            - name: POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: authentik
-                  key: AUTHENTIK_POSTGRESQL__PASSWORD
-            - name: POSTGRES_DB
-              valueFrom:
-                secretKeyRef:
-                  name: authentik
-                  key: AUTHENTIK_POSTGRESQL__NAME
-            - name: PGDATA
-              value: /var/lib/postgresql/data/pgdata
-          ports:
-            - name: tcp-postgresql
-              containerPort: 5432
-          readinessProbe:
-            exec:
-              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
-            initialDelaySeconds: 5
-            periodSeconds: 5
-          volumeMounts:
-            - name: data
-              mountPath: /var/lib/postgresql/data
-      volumes:
+      - name: postgresql
+        image: postgres:18-alpine@sha256:1b1689b20d16a014a3d195653381cf2caa75a41a92d93b255a9d6ea29fd353aa
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: authentik
+              key: AUTHENTIK_POSTGRESQL__USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: authentik
+              key: AUTHENTIK_POSTGRESQL__PASSWORD
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: authentik
+              key: AUTHENTIK_POSTGRESQL__NAME
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+        ports:
+        - name: tcp-postgresql
+          containerPort: 5432
+        readinessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        volumeMounts:
         - name: data
-          emptyDir: {}
----
-# OSS Valkey — BSD-licensed, Linux-Foundation Redis fork; replaces the removed
-# Bitnami image (bitnami/redis). Wire-compatible with the redis client Authentik
-# uses. Pod labels match the existing authentik-redis-master Service selector.
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: authentik-redis-master
-  namespace: "default"
-  labels:
-    app.kubernetes.io/instance: authentik
-    app.kubernetes.io/name: redis
-    app.kubernetes.io/component: master
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/instance: authentik
-      app.kubernetes.io/name: redis
-      app.kubernetes.io/component: master
-  template:
-    metadata:
-      labels:
-        app.kubernetes.io/instance: authentik
-        app.kubernetes.io/name: redis
-        app.kubernetes.io/component: master
-    spec:
-      containers:
-        - name: redis
-          image: valkey/valkey:9-alpine@sha256:a35428eba9043cc0b79dbe54100f0c92784f2de00ad09b01182bfb1c5c83d1bd
-          imagePullPolicy: IfNotPresent
-          args: ["--save", "60", "1", "--loglevel", "warning"]
-          ports:
-            - name: redis
-              containerPort: 6379
-          readinessProbe:
-            exec:
-              command: ["sh", "-c", "valkey-cli ping | grep -q PONG"]
-            initialDelaySeconds: 5
-            periodSeconds: 5
+          mountPath: /var/lib/postgresql/data
+      volumes:
+      - name: data
+        emptyDir: {}

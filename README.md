@@ -14,7 +14,7 @@ A proof-of-concept that drives [Authentik](https://goauthentik.io/) programmatic
 
 The repo has two halves:
 
-- **Deploy Authentik** — locally via Docker Compose (lightweight) or on a full Kubernetes cluster via KinD (with `cloud-provider-kind` for LoadBalancer support and OSS PostgreSQL + Valkey datastores).
+- **Deploy Authentik** — locally via Docker Compose (lightweight) or on a full Kubernetes cluster via KinD (with `cloud-provider-kind` for LoadBalancer support and OSS PostgreSQL datastore).
 - **`provisioner/`** — a Go program that provisions a demo org structure (groups, users, tokens) and verifies it end-to-end via the Authentik client.
 
 ```mermaid
@@ -25,19 +25,16 @@ flowchart LR
         direction TB
         SERVER["Authentik server<br/>REST API + Web UI"]
         WORKER["Authentik worker<br/>background tasks"]
-        PG[("PostgreSQL")]
-        REDIS[("Redis / Valkey")]
+        PG[("PostgreSQL<br/>(cache + broker + channels too)")]
         SERVER --- WORKER
         SERVER --> PG
-        SERVER --> REDIS
         WORKER --> PG
-        WORKER --> REDIS
     end
 
     POC -->|"HTTPS REST API + admin bootstrap token"| SERVER
 
     COMPOSE["Option A: Docker Compose (compose/)<br/>target https://127.0.0.1:9443"]
-    KIND["Option B: KinD + cloud-provider-kind (k8s/)<br/>LoadBalancer IP, target https://LB-IP:443<br/>postgres:18-alpine, valkey:9-alpine"]
+    KIND["Option B: KinD + cloud-provider-kind (k8s/)<br/>LoadBalancer IP, target https://LB-IP:443<br/>postgres:18-alpine"]
 
     COMPOSE -.deploys.-> AUTHENTIK
     KIND -.deploys.-> AUTHENTIK
@@ -48,7 +45,7 @@ flowchart LR
     classDef deploy fill:#f3e5f5,stroke:#6a1b9a,color:#4a148c;
     class POC poc;
     class SERVER,WORKER svc;
-    class PG,REDIS data;
+    class PG data;
     class COMPOSE,KIND deploy;
 ```
 
@@ -110,7 +107,7 @@ Authentik is served at `https://127.0.0.1:9443`.
 
 ### Kubernetes (KinD)
 
-Stands up a full KinD cluster with a `cloud-provider-kind` LoadBalancer and OSS PostgreSQL + Valkey datastores:
+Stands up a full KinD cluster with a `cloud-provider-kind` LoadBalancer and OSS PostgreSQL datastore:
 
 ```bash
 cd provisioner
@@ -199,6 +196,7 @@ Run `make help` for the full list. Common targets:
 | `make image-scan` | Build the image and scan it for HIGH/CRITICAL CVEs (Trivy) |
 | `make compose-up` / `make compose-down` | Start / stop the Authentik Compose stack |
 | `make kind-up` / `make kind-down` | Create+deploy / destroy the KinD cluster |
+| `make k8s-generate` | Regenerate `k8s/postgresql/` from the pinned Authentik chart + `values.yml` |
 | `make e2e-compose` / `make e2e` | End-to-end against Compose / KinD |
 | `make renovate-validate` | Validate `renovate.json` |
 | `make ci` | Full local CI pipeline (`static-check` + `test` + `build`) |
@@ -220,7 +218,7 @@ to regenerate them.
 ## Notes & caveats
 
 - **Demo credentials.** All shipped secrets in `.env.example` files are for demonstration only — rotate them before any real use.
-- **OSS datastores.** The Kubernetes PostgreSQL/Redis were swapped from the removed Bitnami images to OSS `postgres` + `valkey`.
+- **OSS datastore.** The Kubernetes manifest is generated from the Authentik Helm chart with its bundled Bitnami PostgreSQL subchart disabled (the Bitnami image was removed from Docker Hub) and an OSS `postgres:18-alpine` workload supplied instead — see `make k8s-generate`. No Redis/Valkey: Authentik dropped Redis in 2025.10 (cache, task broker, and channels are all PostgreSQL-backed).
 - **PostgreSQL is the only supported datastore.** CockroachDB and YugabyteDB were evaluated as alternatives and neither works with Authentik's Django migrations (CockroachDB lacks session `pg_advisory_lock()`; YugabyteDB has it but its distributed-transaction model aborts the migrations on `YB001`). The experimental manifests were removed; the full investigation is kept in [`docs/spikes/authentik-cockroachdb-yugabytedb.md`](docs/spikes/authentik-cockroachdb-yugabytedb.md).
 
 ## References

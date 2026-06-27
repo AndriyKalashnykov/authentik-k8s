@@ -31,7 +31,7 @@
       "description": "Makefile tool-version constants pinned via # renovate: comments. currentValue must start with a digit so image refs are handled by the dedicated manager below.",
       "managerFilePatterns": ["/(^|/)Makefile$/"],
       "matchStrings": [
-        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)(?: versioning=(?<versioning>\\S+))?(?: extractVersion=(?<extractVersion>\\S+))?\\s+[A-Z0-9_]+\\s*:?=\\s*(?<currentValue>[0-9][^\\s@]*)"
+        "# renovate: datasource=(?<datasource>\\S+) depName=(?<depName>\\S+)(?: registryUrl=(?<registryUrl>\\S+))?(?: versioning=(?<versioning>\\S+))?(?: extractVersion=(?<extractVersion>\\S+))?\\s+[A-Z0-9_]+\\s*:?=\\s*(?<currentValue>[0-9][^\\s@]*)"
       ]
     },
     {

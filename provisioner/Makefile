@@ -16,8 +16,15 @@ COMPOSE     := docker compose --project-directory $(COMPOSE_DIR) -f $(COMPOSE_DI
 KIND_CLUSTER_NAME ?= authentik-e2e
 KUBECTL           := kubectl --context=kind-$(KIND_CLUSTER_NAME)
 MANIFEST          := ../k8s/postgresql/authentik-postgresql.yml
+K8S_DIR           := ../k8s/postgresql
 KIND_CONFIG       := ../k8s/kind-config.yaml
 AUTHENTIK_NS      := default
+HELM_REPO_URL     := https://charts.goauthentik.io
+# Authentik Helm chart version — the SOURCE for `make k8s-generate`. The committed
+# k8s manifest is regenerated from this chart + k8s/postgresql/values.yml; a CI
+# drift gate (k8s-drift) fails if they're out of sync. Chart version == app version.
+# renovate: datasource=helm depName=authentik registryUrl=https://charts.goauthentik.io
+AUTHENTIK_CHART_VERSION := 2026.5.3
 # Track the REGISTRY image (the consumed sink), not the GitHub release: registry.k8s.io
 # image promotion lags the upstream release, so github-releases proposes un-pullable tags.
 # The `# renovate:` line MUST stay immediately above the constant (customManager adjacency).
@@ -231,12 +238,32 @@ kind-create: deps-kind
 		-v /var/run/docker.sock:/var/run/docker.sock \
 		registry.k8s.io/cloud-provider-kind/cloud-controller-manager:v$(CLOUD_PROVIDER_KIND_VERSION) >/dev/null
 
+#k8s-generate: @ Regenerate the k8s manifest from the pinned Authentik chart + OSS datastores
+k8s-generate: deps
+	@helm repo add authentik $(HELM_REPO_URL) >/dev/null 2>&1 || true; helm repo update authentik >/dev/null 2>&1
+	@{ helm template authentik authentik/authentik --version $(AUTHENTIK_CHART_VERSION) -f $(K8S_DIR)/values.yml --namespace $(AUTHENTIK_NS) \
+	   | sed -E '/^[[:space:]]*helm\.sh\/chart:/d; /^[[:space:]]*app\.kubernetes\.io\/version:/d; /^[[:space:]]*app\.kubernetes\.io\/managed-by:[[:space:]]*"?Helm"?[[:space:]]*$$/d'; \
+	   cat $(K8S_DIR)/oss-datastores.yml; } > $(MANIFEST)
+	@echo "k8s-generate: wrote $(MANIFEST)"
+
+#k8s-generate-check: @ Drift gate — fail if the committed k8s manifest is out of sync with the chart + values.yml
+k8s-generate-check: deps
+	@helm repo add authentik $(HELM_REPO_URL) >/dev/null 2>&1 || true; helm repo update authentik >/dev/null 2>&1
+	@{ helm template authentik authentik/authentik --version $(AUTHENTIK_CHART_VERSION) -f $(K8S_DIR)/values.yml --namespace $(AUTHENTIK_NS) \
+	   | sed -E '/^[[:space:]]*helm\.sh\/chart:/d; /^[[:space:]]*app\.kubernetes\.io\/version:/d; /^[[:space:]]*app\.kubernetes\.io\/managed-by:[[:space:]]*"?Helm"?[[:space:]]*$$/d'; \
+	   cat $(K8S_DIR)/oss-datastores.yml; } > /tmp/k8s-gen-check.yml
+	@if diff -u $(MANIFEST) /tmp/k8s-gen-check.yml >/dev/null 2>&1; then \
+	   echo "k8s-generate-check: in sync"; \
+	 else \
+	   echo "DRIFT: $(MANIFEST) is stale vs the pinned chart + values.yml — run 'make k8s-generate' and commit:"; \
+	   diff -u $(MANIFEST) /tmp/k8s-gen-check.yml | head -50; exit 1; \
+	 fi
+
 #kind-deploy: @ Deploy Authentik to the KinD cluster and wait until ready
 kind-deploy: kind-create
-	@$(KUBECTL) apply --server-side --force-conflicts -f $(MANIFEST)
-	@echo "Waiting for PostgreSQL + Redis (OSS: postgres + valkey)..."
+	@$(KUBECTL) -n $(AUTHENTIK_NS) apply --server-side --force-conflicts -f $(MANIFEST)
+	@echo "Waiting for PostgreSQL (OSS postgres:18)..."
 	@$(KUBECTL) -n $(AUTHENTIK_NS) rollout status deployment/authentik-postgresql --timeout=180s
-	@$(KUBECTL) -n $(AUTHENTIK_NS) rollout status deployment/authentik-redis-master --timeout=180s
 	@echo "Waiting for Authentik server + worker..."
 	@$(KUBECTL) -n $(AUTHENTIK_NS) rollout status deployment/authentik-server --timeout=300s
 	@$(KUBECTL) -n $(AUTHENTIK_NS) rollout status deployment/authentik-worker --timeout=300s
@@ -282,6 +309,6 @@ ci: static-check test build
 	@echo "Local CI pipeline passed."
 
 .PHONY: help deps deps-check check-toolchain-alignment build run test lint lint-docker \
-	vulncheck mermaid-lint compose-lint trivy-fs secrets static-check image-build image-run image-scan update clean renovate-validate \
+	vulncheck mermaid-lint compose-lint trivy-fs secrets static-check image-build image-run image-scan k8s-generate k8s-generate-check update clean renovate-validate \
 	compose-up compose-down compose-logs e2e-compose deps-kind kind-create kind-deploy \
 	e2e kind-destroy kind-up kind-down ci
