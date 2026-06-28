@@ -35,11 +35,19 @@ test("forward-auth: a browser user logs in via Authentik and whoami serves the i
   await page.click('button[type="submit"]');
 
   // 4. The OAuth round-trip lands back on the whoami host, whose plain-text page prints "Hostname:".
+  //    Let the redirect chain settle, then poll — and tolerate mid-navigation: a page.evaluate that
+  //    races a redirect throws "Execution context was destroyed", which expect.poll treats as a hard
+  //    failure, so catch it and keep polling until the page settles on whoami.
+  await page.waitForLoadState("networkidle").catch(() => {});
   await expect
     .poll(
       async () => {
-        const text = await page.evaluate(() => document.body?.innerText ?? "");
-        return /Hostname:/.test(text) && /whoami\.127-0-0-1\.sslip\.io/.test(page.url());
+        try {
+          const text = await page.evaluate(() => document.body?.innerText ?? "");
+          return /Hostname:/.test(text) && /whoami\.127-0-0-1\.sslip\.io/.test(page.url());
+        } catch {
+          return false; // mid-navigation (context destroyed) — retry
+        }
       },
       { timeout: LAND_TIMEOUT_MS, intervals: [1000] },
     )
