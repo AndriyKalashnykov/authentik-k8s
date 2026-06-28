@@ -6,7 +6,7 @@
 
 # Authentik Provisioning with the Go Client
 
-*Provision Authentik — groups, users, passwords, OAuth tokens, and forward-auth application access — programmatically with the Go client. Deploy on Kubernetes (KinD) or Docker Compose.*
+*Provision a multi-org Authentik hierarchy — per-org groups, users, passwords, OAuth tokens — programmatically with the Go client, plus opt-in forward-auth application access. Deploy on Kubernetes (KinD) or Docker Compose.*
 
 A proof-of-concept that drives [Authentik](https://goauthentik.io/) programmatically via its Go client library [`goauthentik.io/api/v3`](https://github.com/goauthentik/client-go). The core flow creates groups, users, passwords and OAuth tokens, then re-authenticates as a created user to read its group membership. An optional second demo extends the same client from provisioning identities to controlling **application access** — it configures an Authentik proxy provider, application, and embedded-outpost binding so that [Traefik](https://traefik.io/)'s `forwardAuth` middleware gates a sample app behind Authentik login. It ships with two ways to stand up Authentik (Docker Compose or KinD) plus the Go POC that runs against it.
 
