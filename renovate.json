@@ -12,6 +12,7 @@
     "docker-compose",
     "kubernetes",
     "mise",
+    "npm",
     "custom.regex"
   ],
   "commitMessagePrefix": "chore(all): ",
@@ -24,6 +25,9 @@
   "postUpdateOptions": ["gomodTidy"],
   "kubernetes": {
     "managerFilePatterns": ["/k8s/postgresql/oss-datastores\\.yml$/"]
+  },
+  "npm": {
+    "minimumReleaseAge": "3 days"
   },
   "customManagers": [
     {

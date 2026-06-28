@@ -14,6 +14,12 @@ COMPOSE     := docker compose --project-directory $(COMPOSE_DIR) -f $(COMPOSE_DI
 # Base stack + the Traefik/whoami forward-auth overlay.
 COMPOSE_FA  := $(COMPOSE) -f $(COMPOSE_DIR)/forward-auth/docker-compose.forward-auth.yml
 WHOAMI_URL  ?= https://whoami.127-0-0-1.sslip.io
+# Playwright full-login browser e2e (e2e-forward-auth-browser).
+BROWSER_E2E_DIR        := ../e2e/browser
+AK_ADMIN_USER          ?= akadmin
+# Extra flags for `playwright install` — CI sets this to `--with-deps` (needs sudo,
+# available on the runner) to pull the chromium OS libraries; empty locally.
+PLAYWRIGHT_BROWSER_DEPS ?=
 
 # --- KinD e2e ---
 KIND_CLUSTER_NAME ?= authentik-e2e
@@ -235,6 +241,13 @@ compose-forward-auth-up: deps
 	 AUTHENTIK_BOOTSTRAP_TOKEN="$$AUTHENTIK_BOOTSTRAP_TOKEN" \
 	 AUTHENTIK_PROVISION_ORGS=false AUTHENTIK_FORWARD_AUTH_ENABLED=true \
 	 go run .
+	@echo "Waiting for the embedded outpost to serve the new authentik_host (login reachable)..."
+	@for i in $$(seq 1 30); do \
+	   code=$$(curl -Lsk -o /tmp/fa-ready.html -w '%{http_code}' --max-time 10 "$(WHOAMI_URL)/" 2>/dev/null || true); \
+	   if [ "$$code" = "200" ] && grep -q 'ak-flow-executor' /tmp/fa-ready.html 2>/dev/null; then echo "login reachable (outpost config live)"; break; fi; \
+	   if [ "$$i" = "30" ]; then echo "ERROR: login not reachable within 60s (outpost authentik_host may not have propagated)"; exit 1; fi; \
+	   sleep 2; \
+	 done
 	@echo ""
 	@echo "Forward-auth demo ready. Browse $(WHOAMI_URL) (accept the self-signed cert);"
 	@echo "Traefik redirects to the Authentik login (akadmin / the bootstrap password),"
@@ -259,6 +272,17 @@ e2e-forward-auth: deps
 	   echo "FAIL: $$url did not reach a working Authentik login (last HTTP $$code; the embedded outpost likely redirects to an unreachable host — check authentik_host)"; \
 	   echo "--- final page (head) ---"; head -c 400 /tmp/fa-login.html 2>/dev/null; echo; \
 	   $(COMPOSE_FA) logs --tail=40 traefik server; exit 1; \
+	 }
+
+#e2e-forward-auth-browser: @ E2E: real browser completes the Authentik login -> whoami serves identity headers -> down (Playwright)
+e2e-forward-auth-browser: deps
+	@command -v node >/dev/null 2>&1 || { echo "node missing — run 'make deps' (node is pinned in .mise.toml)"; exit 1; }
+	@trap '$(COMPOSE_FA) down -v >/dev/null 2>&1 || true' EXIT INT TERM; \
+	 $(MAKE) --no-print-directory compose-forward-auth-up && { \
+	   set -a; . $(COMPOSE_DIR)/.env; set +a; \
+	   cd $(BROWSER_E2E_DIR) && npm ci && npx playwright install $(PLAYWRIGHT_BROWSER_DEPS) chromium && \
+	   APP_URL=$(WHOAMI_URL)/ AK_ADMIN_USER=$(AK_ADMIN_USER) AK_ADMIN_PASS="$$AUTHENTIK_BOOTSTRAP_PASSWORD" \
+	   npx playwright test; \
 	 }
 
 # ---------------------------------------------------------------------------
@@ -371,6 +395,6 @@ ci: static-check test build
 .PHONY: help deps deps-check check-toolchain-alignment build run test lint lint-docker \
 	vulncheck mermaid-lint compose-lint trivy-fs secrets static-check image-build image-run image-scan k8s-generate k8s-generate-check update clean renovate-validate \
 	compose-up compose-down compose-logs \
-	compose-forward-auth-up compose-forward-auth-down e2e-forward-auth \
+	compose-forward-auth-up compose-forward-auth-down e2e-forward-auth e2e-forward-auth-browser \
 	e2e-compose deps-kind kind-create kind-deploy \
 	e2e kind-destroy kind-up kind-down ci
