@@ -45,7 +45,7 @@ KIND_NODE_IMAGE := kindest/node:v1.36.1@sha256:3489c7674813ba5d8b1a9977baea8a6e5
 # mermaid-cli is a docker-only tool (no mise backend); pinned here, Renovate-tracked
 # via the Makefile customManager. Used by `mermaid-lint` to validate README diagrams.
 # renovate: datasource=docker depName=minlag/mermaid-cli
-MERMAID_CLI_VERSION := 11.15.0
+MERMAID_CLI_VERSION := 11.16.0
 
 # dclint (docker-compose-linter) is a docker-only tool (no mise backend); pinned
 # here, Renovate-tracked via the Makefile customManager. Used by `compose-lint`
