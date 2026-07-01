@@ -3,6 +3,7 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ['v*']          # a version tag builds + publishes the provisioner image (publish job)
   pull_request:
   workflow_dispatch:
 
@@ -24,12 +25,16 @@ jobs:
   # Doc / k8s changes skip the heavy jobs (positive allow-list — the code paths
   # here are enumerable). CLAUDE.md is project config, not docs, so it counts as
   # code. compose/** + .dclintrc.yaml are included because static-check runs
-  # compose-lint (dclint) and the e2e job exercises the Compose stack.
+  # compose-lint (dclint) and the e2e job exercises the Compose stack; .gitleaks.toml
+  # is included because static-check's `secrets` gate consumes it. `docs` (README.md)
+  # is separate: a README-only edit still needs `mermaid-lint` (README carries Mermaid
+  # diagrams) but not the full code pipeline — see the mermaid-lint job.
   changes:
     runs-on: ubuntu-latest
     timeout-minutes: 2
     outputs:
       code: ${{ steps.filter.outputs.code }}
+      docs: ${{ steps.filter.outputs.docs }}
       k8s: ${{ steps.filter.outputs.k8s }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
@@ -44,14 +49,17 @@ jobs:
               - 'compose/**'
               - 'e2e/**'
               - '.dclintrc.yaml'
+              - '.gitleaks.toml'
+            docs:
+              - 'README.md'
             k8s:
-              - 'k8s/postgresql/**'
+              - 'k8s/**'
               - 'provisioner/Makefile'
               - 'provisioner/.mise.toml'
 
   static-check:
     needs: [changes]
-    if: ${{ !failure() && !cancelled() && needs.changes.outputs.code == 'true' }}
+    if: ${{ !failure() && !cancelled() && (needs.changes.outputs.code == 'true' || startsWith(github.ref, 'refs/tags/')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -69,7 +77,7 @@ jobs:
 
   build:
     needs: [changes, static-check]
-    if: ${{ !failure() && !cancelled() && needs.changes.outputs.code == 'true' }}
+    if: ${{ !failure() && !cancelled() && (needs.changes.outputs.code == 'true' || startsWith(github.ref, 'refs/tags/')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -87,7 +95,7 @@ jobs:
 
   test:
     needs: [changes, static-check]
-    if: ${{ !failure() && !cancelled() && needs.changes.outputs.code == 'true' }}
+    if: ${{ !failure() && !cancelled() && (needs.changes.outputs.code == 'true' || startsWith(github.ref, 'refs/tags/')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -108,7 +116,7 @@ jobs:
   # (hadolint in static-check only lints the Dockerfile, it never builds it).
   docker:
     needs: [changes, static-check]
-    if: ${{ !failure() && !cancelled() && needs.changes.outputs.code == 'true' }}
+    if: ${{ !failure() && !cancelled() && (needs.changes.outputs.code == 'true' || startsWith(github.ref, 'refs/tags/')) }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -121,7 +129,7 @@ jobs:
           install: true
           cache: true
           working_directory: provisioner
-      - name: Build + scan image
+      - name: Build and scan image
         run: make image-scan
 
   # Drift gate: the committed k8s/postgresql manifest is generated from the pinned
@@ -142,7 +150,8 @@ jobs:
           install: true
           cache: true
           working_directory: provisioner
-      - name: Verify k8s manifest matches the pinned chart + values.yml
+      # Verifies the committed manifest matches the pinned Authentik chart + values.yml.
+      - name: Verify k8s manifest drift
         run: make k8s-generate-check
 
   # Live e2e: stand up Authentik via Docker Compose, provision + verify with the
@@ -162,7 +171,8 @@ jobs:
           install: true
           cache: true
           working_directory: provisioner
-      - name: E2E (Authentik via Docker Compose)
+      # Stands up Authentik via Docker Compose, provisions + verifies, tears down.
+      - name: E2E
         run: make e2e-compose
 
   # Live forward-auth e2e: stand up Authentik + Traefik + traefik/whoami via Docker
@@ -185,14 +195,96 @@ jobs:
           install: true
           cache: true
           working_directory: provisioner
-      - name: E2E forward-auth full login (Playwright)
+      # Real headless-browser (Playwright) Authentik login; asserts whoami serves identity headers.
+      - name: E2E forward-auth browser login
         run: make e2e-forward-auth-browser
         env:
           PLAYWRIGHT_BROWSER_DEPS: --with-deps
 
+  # Full KinD e2e: create a KinD cluster + cloud-provider-kind, deploy the real
+  # k8s/postgresql manifests, provision + verify via the Go POC against the
+  # LoadBalancer, tear down. Catches manifest-wiring regressions (Service selector,
+  # PGDATA mount, Secret wiring) the Compose e2e can't see. Heavier (~10-15 min);
+  # runs on code OR k8s changes (the k8s filter now covers all of k8s/**).
+  e2e-kind:
+    needs: [changes, build, test]
+    if: ${{ !failure() && !cancelled() && (needs.changes.outputs.code == 'true' || needs.changes.outputs.k8s == 'true') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: provisioner
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+        with:
+          install: true
+          cache: true
+          working_directory: provisioner
+      - name: E2E on KinD
+        run: make e2e
+
+  # README carries Mermaid diagrams validated by `make mermaid-lint` (inside
+  # static-check). A README-only edit is docs-only (code=false), so static-check
+  # skips — this job runs mermaid-lint on those changes so a broken diagram can't
+  # merge green. Only needs docker (pulls minlag/mermaid-cli); no mise.
+  mermaid-lint:
+    needs: [changes]
+    if: ${{ !failure() && !cancelled() && needs.changes.outputs.code != 'true' && needs.changes.outputs.docs == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    defaults:
+      run:
+        working-directory: provisioner
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Lint README Mermaid diagrams
+        run: make mermaid-lint
+
+  # Release publish: on a version tag (v*), build the provisioner image and push it
+  # to GHCR — only after the PR-path validators (build + test + image scan) pass on
+  # the tagged commit. GHCR auth uses the built-in GITHUB_TOKEN (no operator secret).
+  # Cosign signing / richer SBOM attestation are a `/harden-image-pipeline` follow-up.
+  publish:
+    needs: [build, test, docker]
+    if: ${{ !failure() && !cancelled() && startsWith(github.ref, 'refs/tags/') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - name: Log in to GHCR
+        uses: docker/login-action@650006c6eb7dba73a995cc03b0b2d7f5ca915bee # v4.2.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Docker metadata
+        id: meta
+        uses: docker/metadata-action@80c7e94dd9b9319bd5eb7a0e0fe9291e23a2a2e9 # v6.1.0
+        with:
+          images: ghcr.io/${{ github.repository }}/provisioner
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+      # Build context is provisioner/ (matches the Makefile `docker build … .`).
+      - name: Build and push image
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v7.3.0
+        with:
+          context: provisioner
+          file: provisioner/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: mode=max
+          sbom: true
+
   ci-pass:
     if: always()
-    needs: [changes, static-check, build, test, docker, k8s-drift, e2e, e2e-forward-auth-browser]
+    needs: [changes, static-check, build, test, docker, k8s-drift, e2e, e2e-kind, e2e-forward-auth-browser, mermaid-lint, publish]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:

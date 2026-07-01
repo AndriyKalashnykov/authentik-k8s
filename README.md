@@ -8,7 +8,7 @@
 
 *Provision a multi-org Authentik hierarchy — per-org groups, users, passwords, OAuth tokens — programmatically with the Go client, plus opt-in forward-auth application access. Deploy on Kubernetes (KinD) or Docker Compose.*
 
-A proof-of-concept that drives [Authentik](https://goauthentik.io/) programmatically via its Go client library [`goauthentik.io/api/v3`](https://github.com/goauthentik/client-go). The core flow creates groups, users, passwords and OAuth tokens, then re-authenticates as a created user to read its group membership. An optional second demo extends the same client from provisioning identities to controlling **application access** — it configures an Authentik proxy provider, application, and embedded-outpost binding so that [Traefik](https://traefik.io/)'s `forwardAuth` middleware gates a sample app behind Authentik login. It ships with two ways to stand up Authentik (Docker Compose or KinD) plus the Go POC that runs against it.
+A proof-of-concept that drives [Authentik](https://goauthentik.io/) programmatically via its Go client library [`goauthentik.io/api/v3`](https://github.com/goauthentik/client-go). The core flow creates groups, users, passwords and OAuth tokens, then re-authenticates as a created user to read its group membership. An optional second demo extends the same client from provisioning identities to controlling **application access** — it configures an Authentik proxy provider, application, and embedded-outpost binding so that [Traefik](https://traefik.io/)'s `forwardAuth` middleware gates a sample app behind Authentik login. It ships with two ways to stand up Authentik (Docker Compose or KinD) plus the Go POC that runs against it. On the delivery side it carries hermetic `httptest` API-contract tests plus live Compose/KinD and Playwright browser e2e layers, a distroless container image, a composite security gate (Trivy filesystem + image scans, gitleaks, hadolint, govulncheck), a mise-pinned toolchain, and Renovate-tracked pins — all enforced in GitHub Actions CI.
 
 ## Overview
 
@@ -50,6 +50,21 @@ flowchart LR
 ```
 
 Everything is configured through environment variables — there are no hardcoded hosts, ports or secrets. Each consumer ships a committed `.env.example` (the source of truth) and reads an optional gitignored `.env` for overrides.
+
+## Tech stack
+
+| Component | Technology |
+|-----------|------------|
+| Provisioner | Go, [`goauthentik.io/api/v3`](https://github.com/goauthentik/client-go) (Authentik REST client) |
+| Identity provider | [Authentik](https://goauthentik.io/) (server + worker) |
+| Datastore | PostgreSQL (cache, task broker and channels too — no Redis) |
+| Forward-auth demo | [Traefik](https://traefik.io/) v3 + [`traefik/whoami`](https://github.com/traefik/whoami) |
+| Local Kubernetes | KinD + `cloud-provider-kind` (LoadBalancer) |
+| Runtime | Docker Compose; distroless container image |
+| Toolchain manager | [mise](https://mise.jdx.dev) |
+| Tests | Go `httptest` API contracts, live Compose/KinD e2e, [Playwright](https://playwright.dev) browser login |
+| Security gates | Trivy (filesystem + image), gitleaks, hadolint, govulncheck |
+| CI / dependencies | GitHub Actions, [Renovate](https://renovatebot.com) |
 
 ## Quick start
 
@@ -287,9 +302,10 @@ Run `make help` for the full list. Common targets:
 | `make renovate-validate` | Validate `renovate.json` |
 | `make ci` | Full local CI pipeline (`static-check` + `test` + `build`) |
 
-- **Toolchain** — pinned in `provisioner/.mise.toml` (go 1.26.4, golangci-lint, govulncheck, hadolint, kind, kubectl); installed with `make deps`.
+- **Toolchain** — pinned in `provisioner/.mise.toml` (Go + golangci-lint, govulncheck, hadolint, kind, kubectl, node); installed with `make deps`. (Versions live in the pin files, not here, so they can't drift.)
 - **Renovate** — `renovate.json` tracks every pinned version; validate with `make renovate-validate`.
-- **CI** — `.github/workflows/ci.yml` runs static-check + build + test + a `docker` job (image build + Trivy scan) + a live `e2e` job (Authentik via Compose). Reproduce the core gate locally with `make ci`.
+- **CI** — `.github/workflows/ci.yml` (a `changes` path-filter gates the heavy jobs): `static-check` → `build` → `test` → `docker` (image build + Trivy scan, no push) → `k8s-drift` (manifest-vs-chart drift gate) → `e2e` (Authentik via Compose) → `e2e-kind` (full KinD cluster deploying the real `k8s/` manifests) → `e2e-forward-auth-browser` (real Playwright login) → `ci-pass`, plus a `mermaid-lint` job for README-only edits and a `publish` job that pushes the image to GHCR on `v*` tags. Reproduce the core gate locally with `make ci`.
+- **Container image** — pushing a `v*` tag publishes the provisioner image to `ghcr.io/andriykalashnykov/authentik-k8s/provisioner` (`docker pull ghcr.io/andriykalashnykov/authentik-k8s/provisioner:<tag>`). On PRs/branch pushes the image is built + Trivy-scanned but **not** pushed.
 
 ## Web UI
 

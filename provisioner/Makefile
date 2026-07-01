@@ -104,9 +104,9 @@ run: deps
 	@set -a; [ -f .env.example ] && . ./.env.example; [ -f .env ] && . ./.env; set +a; \
 	 export GOFLAGS=$(GOFLAGS) TZ=UTC; go run main.go
 
-#test: @ Run unit + httptest contract tests
+#test: @ Run unit + httptest contract tests (race detector + coverage)
 test: deps
-	@export GOFLAGS=$(GOFLAGS) TZ=UTC; go test ./...
+	@export GOFLAGS=$(GOFLAGS) TZ=UTC; go test -race -cover ./...
 
 #lint: @ Run golangci-lint and verify go.mod/go.sum are tidy
 lint: deps
@@ -139,7 +139,7 @@ mermaid-lint:
 	FAILED=0; \
 	for md in $$MD_FILES; do \
 		echo "Validating Mermaid blocks in $$md..."; \
-		if docker run --rm -v "$(PWD)/..:/data:ro" "$$IMAGE" \
+		if docker run --rm -v "$(CURDIR)/..:/data:ro" "$$IMAGE" \
 			-i "/data/$$md" -o "/tmp/$$(basename $$md .md).svg" >/tmp/mmlint.log 2>&1; then \
 			echo "  OK"; \
 		else \
@@ -152,7 +152,7 @@ mermaid-lint:
 #compose-lint: @ Lint the Compose file (zavoloklom/dclint; rules in .dclintrc.yaml, --max-warnings 0)
 compose-lint:
 	@command -v docker >/dev/null 2>&1 || { echo "ERROR: docker is required for compose-lint"; exit 1; }
-	@docker run --rm -v "$(PWD)/..:/w:ro" -w /w zavoloklom/dclint:$(DCLINT_VERSION) \
+	@docker run --rm -v "$(CURDIR)/..:/w:ro" -w /w zavoloklom/dclint:$(DCLINT_VERSION) \
 		--max-warnings 0 compose/docker-compose.yml compose/forward-auth/docker-compose.forward-auth.yml
 	@echo "compose-lint: OK"
 
