@@ -129,6 +129,17 @@
       "matchPackageNames": ["ghcr.io/goauthentik/server", "authentik"],
       "groupName": "Authentik",
       "pinDigests": false
+    },
+    {
+      "description": "Group the Go client (gomod) into the Authentik PR: goauthentik.io/api/v3 is the generated client, loosely version-coupled to the server release (v3.2026050.3 ↔ 2026.5), so bump it together with the server image + Helm chart to keep the POC's client aligned with the running server.",
+      "matchManagers": ["gomod"],
+      "matchPackageNames": ["goauthentik.io/api/v3"],
+      "groupName": "Authentik"
+    },
+    {
+      "description": "Group the two postgres pins so they bump as one PR: the compose stack (docker-compose, docker.io/library/postgres) and the OSS k8s datastore (kubernetes, postgres). NOTE: a k8s postgres bump also requires `make k8s-generate` because oss-datastores.yml is concatenated into the committed authentik-postgresql.yml — the k8s-drift gate reddens the PR until it's regenerated (automerge is off, so a human runs it).",
+      "matchPackageNames": ["postgres", "docker.io/library/postgres"],
+      "groupName": "postgresql"
     }
   ]
 }

@@ -80,6 +80,47 @@ func env(key, fallback string) string {
 	return fallback
 }
 
+// provision is one (org, role) request: names are derived from the org, and the
+// per-user OAuth token key is externalized to env.
+type provision struct {
+	org       string
+	role      string // roleAdmin | roleUser
+	group     string // groupAdmins | groupUsers
+	superuser bool   // admins can log into the Authentik admin UI
+	token     string
+}
+
+// buildProvisionRequests builds the four (org, role) provisioning requests for
+// the two demo orgs. `get` is the env lookup (key, fallback) -> value, injected
+// so the table (and the token env-overrides) is unit-testable without a process
+// environment; production passes env.
+func buildProvisionRequests(org1, org2 string, get func(key, fallback string) string) []provision {
+	return []provision{
+		{org1, roleAdmin, groupAdmins, true, get("AUTHENTIK_ORG1_ADMIN_TOKEN", defaultOrg1AdminToken)},
+		{org1, roleUser, groupUsers, false, get("AUTHENTIK_ORG1_USER_TOKEN", defaultOrg1UserToken)},
+		{org2, roleAdmin, groupAdmins, true, get("AUTHENTIK_ORG2_ADMIN_TOKEN", defaultOrg2AdminToken)},
+		{org2, roleUser, groupUsers, false, get("AUTHENTIK_ORG2_USER_TOKEN", defaultOrg2UserToken)},
+	}
+}
+
+// buildForwardAuthConfig assembles the forward-auth demo config from env, with
+// the documented defaults. `get` is injected for the same reason as above so the
+// gate/assembly logic the forward-auth demo depends on is unit-testable.
+func buildForwardAuthConfig(get func(key, fallback string) string) authentik.ForwardAuthConfig {
+	return authentik.ForwardAuthConfig{
+		ProviderName:          get("AUTHENTIK_FORWARD_AUTH_PROVIDER_NAME", defaultFwdProviderName),
+		AppName:               get("AUTHENTIK_FORWARD_AUTH_APP_NAME", defaultFwdAppName),
+		AppSlug:               get("AUTHENTIK_FORWARD_AUTH_APP_SLUG", defaultFwdAppSlug),
+		ExternalHost:          get("AUTHENTIK_FORWARD_AUTH_EXTERNAL_HOST", defaultFwdExternalHost),
+		Mode:                  get("AUTHENTIK_FORWARD_AUTH_MODE", defaultFwdMode),
+		CookieDomain:          get("AUTHENTIK_FORWARD_AUTH_COOKIE_DOMAIN", defaultFwdCookieDomain),
+		AuthentikHost:         get("AUTHENTIK_FORWARD_AUTH_HOST", defaultFwdAuthentikHost),
+		AuthentikHostInsecure: get("AUTHENTIK_FORWARD_AUTH_HOST_INSECURE", "true") == "true",
+		AuthorizationFlowSlug: get("AUTHENTIK_FORWARD_AUTH_AUTHZ_FLOW", defaultFwdAuthzFlow),
+		InvalidationFlowSlug:  get("AUTHENTIK_FORWARD_AUTH_INVALIDATION_FLOW", defaultFwdInvalidationFlow),
+	}
+}
+
 // CreateGroupsAndUsers provisions one group + one user against Authentik, sets the
 // user's password and OAuth token, then re-authenticates as that user to read its
 // group membership. It returns an error (rather than panicking) so callers — and
@@ -180,21 +221,9 @@ func main() {
 	org1 := env("AUTHENTIK_ORG1", defaultOrg1)
 	org2 := env("AUTHENTIK_ORG2", defaultOrg2)
 
-	// One provisioning request per (org, role). Names are derived from the org;
-	// the per-user OAuth token keys are externalized to env.
-	type provision struct {
-		org       string
-		role      string // roleAdmin | roleUser
-		group     string // groupAdmins | groupUsers
-		superuser bool   // admins can log into the Authentik admin UI
-		token     string
-	}
-	requests := []provision{
-		{org1, roleAdmin, groupAdmins, true, env("AUTHENTIK_ORG1_ADMIN_TOKEN", defaultOrg1AdminToken)},
-		{org1, roleUser, groupUsers, false, env("AUTHENTIK_ORG1_USER_TOKEN", defaultOrg1UserToken)},
-		{org2, roleAdmin, groupAdmins, true, env("AUTHENTIK_ORG2_ADMIN_TOKEN", defaultOrg2AdminToken)},
-		{org2, roleUser, groupUsers, false, env("AUTHENTIK_ORG2_USER_TOKEN", defaultOrg2UserToken)},
-	}
+	// One provisioning request per (org, role) — built from env (token keys
+	// externalized), see buildProvisionRequests.
+	requests := buildProvisionRequests(org1, org2, env)
 
 	// The org/user/token provisioning is not idempotent (re-creating an existing
 	// group/user fails), so it can be skipped — e.g. when only (re)running the
@@ -213,18 +242,7 @@ func main() {
 	// traefik/whoami demo and bind it to the embedded outpost. Disabled by
 	// default so the core POC stays a pure user/group/token demo.
 	if env("AUTHENTIK_FORWARD_AUTH_ENABLED", "false") == "true" {
-		cfg := authentik.ForwardAuthConfig{
-			ProviderName:          env("AUTHENTIK_FORWARD_AUTH_PROVIDER_NAME", defaultFwdProviderName),
-			AppName:               env("AUTHENTIK_FORWARD_AUTH_APP_NAME", defaultFwdAppName),
-			AppSlug:               env("AUTHENTIK_FORWARD_AUTH_APP_SLUG", defaultFwdAppSlug),
-			ExternalHost:          env("AUTHENTIK_FORWARD_AUTH_EXTERNAL_HOST", defaultFwdExternalHost),
-			Mode:                  env("AUTHENTIK_FORWARD_AUTH_MODE", defaultFwdMode),
-			CookieDomain:          env("AUTHENTIK_FORWARD_AUTH_COOKIE_DOMAIN", defaultFwdCookieDomain),
-			AuthentikHost:         env("AUTHENTIK_FORWARD_AUTH_HOST", defaultFwdAuthentikHost),
-			AuthentikHostInsecure: env("AUTHENTIK_FORWARD_AUTH_HOST_INSECURE", "true") == "true",
-			AuthorizationFlowSlug: env("AUTHENTIK_FORWARD_AUTH_AUTHZ_FLOW", defaultFwdAuthzFlow),
-			InvalidationFlowSlug:  env("AUTHENTIK_FORWARD_AUTH_INVALIDATION_FLOW", defaultFwdInvalidationFlow),
-		}
+		cfg := buildForwardAuthConfig(env)
 		akadminConfig := authentik.CreateConfiguration(scheme, host, bootstrapToken)
 		akadminApiClient := api.NewAPIClient(akadminConfig)
 		if err := authentik.SetupForwardAuth(ctx, akadminApiClient, cfg); err != nil {

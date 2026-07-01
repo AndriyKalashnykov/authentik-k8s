@@ -17,6 +17,20 @@ test("forward-auth: a browser user logs in via Authentik and whoami serves the i
   // 1. Browse the protected app — unauthenticated, so forwardAuth redirects to Authentik.
   await page.goto(APP_URL, { waitUntil: "domcontentloaded" });
 
+  // 1b. DENY invariant (the security property, not just the happy path): before
+  //     authenticating, whoami MUST NOT be served — forwardAuth intercepts the
+  //     unauth request and we land on the Authentik login. Assert the login field
+  //     is present AND that whoami's body/identity content is absent, so a broken
+  //     or open middleware (serving whoami without auth) fails loudly here.
+  await page.waitForSelector('input[name="uidField"]', { state: "visible" });
+  const preLoginBody = await page.evaluate(() => document.body?.innerText ?? "");
+  expect(preLoginBody, "whoami identity header must NOT be served before login").not.toMatch(
+    /X-Authentik-Username:/i,
+  );
+  expect(preLoginBody, "whoami page body (Hostname:) must NOT be served before login").not.toMatch(
+    /Hostname:/,
+  );
+
   // 2. Identification stage. The flow UI is a shadow-DOM SPA; Playwright pierces open shadow roots.
   await page.fill('input[name="uidField"]', ADMIN_USER);
   await page.click('button[type="submit"]');
