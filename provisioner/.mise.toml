@@ -15,7 +15,7 @@ go = "1.26.4"
 # Authentik chart (templating only; no cluster needed).
 "aqua:helm/helm" = "4.2.2"
 # Security gates (static-check): filesystem CVE/secret/misconfig scan + secret scan.
-"aqua:aquasecurity/trivy" = "0.71.2"
+"aqua:aquasecurity/trivy" = "0.72.0"
 "aqua:gitleaks/gitleaks" = "8.30.1"
 # Node — only for the Playwright full-login browser e2e (make e2e-forward-auth-browser);
 # not needed for build/test/lint. @playwright/test is pinned in ../e2e/browser.
