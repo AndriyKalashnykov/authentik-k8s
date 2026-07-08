@@ -5,7 +5,7 @@
 # all config is supplied at runtime via env (see .env.example / `make image-run`).
 
 # GO_VERSION must match go.mod + .mise.toml (enforced by `make check-toolchain-alignment`).
-ARG GO_VERSION=1.26.4
+ARG GO_VERSION=1.26.5
 
 FROM golang:${GO_VERSION} AS build
 WORKDIR /src
