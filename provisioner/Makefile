@@ -125,6 +125,10 @@ vulncheck: deps
 trivy-fs: deps
 	@trivy fs --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 --no-progress --quiet ..
 
+#cve-scan: @ CVE scanning (govulncheck + trivy filesystem). CI runs this on release TAGS only, not on every PR — a freshly-disclosed CVE in the vuln DB must not block unrelated PRs; it gates the release (publish).
+cve-scan: vulncheck trivy-fs
+	@echo "CVE scan passed."
+
 #secrets: @ Scan the working tree for leaked secrets (gitleaks; demo creds allowlisted in .gitleaks.toml)
 secrets: deps
 	@cd .. && gitleaks detect --no-git --source . -c .gitleaks.toml --redact --no-banner
@@ -156,8 +160,8 @@ compose-lint:
 		--max-warnings 0 compose/docker-compose.yml compose/forward-auth/docker-compose.forward-auth.yml
 	@echo "compose-lint: OK"
 
-#static-check: @ Composite quality gate (alignment + lint + hadolint + mermaid + compose + vulncheck + trivy-fs + secrets)
-static-check: deps check-toolchain-alignment lint lint-docker mermaid-lint compose-lint vulncheck trivy-fs secrets
+#static-check: @ Composite quality gate (alignment + lint + hadolint + mermaid + compose + secrets). CVE scans (vulncheck + trivy-fs) run on release tags only — see cve-scan.
+static-check: deps check-toolchain-alignment lint lint-docker mermaid-lint compose-lint secrets
 	@echo "Static check passed."
 
 #image-build: @ Build the POC container image
@@ -393,7 +397,7 @@ ci: static-check test build
 	@echo "Local CI pipeline passed."
 
 .PHONY: help deps deps-check check-toolchain-alignment build run test lint lint-docker \
-	vulncheck mermaid-lint compose-lint trivy-fs secrets static-check image-build image-run image-scan k8s-generate k8s-generate-check update clean renovate-validate \
+	vulncheck cve-scan mermaid-lint compose-lint trivy-fs secrets static-check image-build image-run image-scan k8s-generate k8s-generate-check update clean renovate-validate \
 	compose-up compose-down compose-logs \
 	compose-forward-auth-up compose-forward-auth-down e2e-forward-auth e2e-forward-auth-browser \
 	e2e-compose deps-kind kind-create kind-deploy \

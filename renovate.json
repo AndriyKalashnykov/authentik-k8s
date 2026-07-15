@@ -72,9 +72,9 @@
       "groupName": "GitHub Actions"
     },
     {
-      "description": "Group the Go toolchain across go.mod, .mise.toml and the Dockerfile so they bump as a unit (paired with `make check-toolchain-alignment`).",
+      "description": "Group the Go toolchain across go.mod, .mise.toml and the Dockerfile so they bump as a unit (paired with `make check-toolchain-alignment`). Match on depName (go/golang), NOT packageName: the mise `go` dep's packageName differs from its depName, so a matchPackageNames group let .mise.toml split into its own PR while go.mod + Dockerfile grouped — matchDepNames catches all three managers.",
       "matchManagers": ["gomod", "mise", "dockerfile"],
-      "matchPackageNames": ["go", "golang"],
+      "matchDepNames": ["go", "golang"],
       "groupName": "go toolchain"
     },
     {
