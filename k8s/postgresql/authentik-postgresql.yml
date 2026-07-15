@@ -239,12 +239,12 @@ spec:
         app.kubernetes.io/component: "server"
         app.kubernetes.io/part-of: "authentik"
       annotations:
-        checksum/secret: 9d5d293a6ea4da77ef3fc302b44e753e3483dc88e01e17245be1462da42830be
+        checksum/secret: 8a8fbfa0415ad55b7e7bb43916ce5552ccca1b8877057d348017acf03f11dbba
     spec:
       terminationGracePeriodSeconds: 30
       containers:
         - name: server
-          image: ghcr.io/goauthentik/server:2026.5.3
+          image: ghcr.io/goauthentik/server:2026.5.5
           imagePullPolicy: IfNotPresent
           args:
             - server
@@ -339,13 +339,13 @@ spec:
         app.kubernetes.io/component: "worker"
         app.kubernetes.io/part-of: "authentik"
       annotations:
-        checksum/secret: 9d5d293a6ea4da77ef3fc302b44e753e3483dc88e01e17245be1462da42830be
+        checksum/secret: 8a8fbfa0415ad55b7e7bb43916ce5552ccca1b8877057d348017acf03f11dbba
     spec:
       serviceAccountName: authentik
       terminationGracePeriodSeconds: 30
       containers:
         - name: worker
-          image: ghcr.io/goauthentik/server:2026.5.3
+          image: ghcr.io/goauthentik/server:2026.5.5
           imagePullPolicy: IfNotPresent
           args:
             - worker
