@@ -111,12 +111,14 @@ jobs:
       - name: Test
         run: make test
 
-  # Build the provisioner image and scan it (Trivy HIGH/CRITICAL). No push — the
-  # POC has no registry; this just proves the image builds and is CVE-clean
-  # (hadolint in static-check only lints the Dockerfile, it never builds it).
+  # Build the provisioner image and scan it (Trivy HIGH/CRITICAL) — RELEASE-TIME
+  # ONLY (version tags). Off the PR path so the image build cost + CVE-DB drift
+  # can't block unrelated PRs; it gates the release (publish needs it). No push
+  # here (publish does that). hadolint in static-check still lints the Dockerfile
+  # on every PR; this builds + scans the actual image before a tag ships.
   docker:
     needs: [changes, static-check]
-    if: ${{ !failure() && !cancelled() && (needs.changes.outputs.code == 'true' || startsWith(github.ref, 'refs/tags/')) }}
+    if: ${{ !failure() && !cancelled() && startsWith(github.ref, 'refs/tags/') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -131,6 +133,28 @@ jobs:
           working_directory: provisioner
       - name: Build and scan image
         run: make image-scan
+
+  # CVE scanning (govulncheck + Trivy filesystem) — RELEASE-TIME ONLY (version
+  # tags). Kept off the PR path so a freshly-disclosed CVE in the vuln DB can't
+  # block unrelated PRs; it gates the release (publish needs it). Renovate keeps
+  # deps + the Go toolchain current between releases.
+  security:
+    needs: [changes, static-check]
+    if: ${{ !failure() && !cancelled() && startsWith(github.ref, 'refs/tags/') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: provisioner
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
+      - uses: jdx/mise-action@e6a8b3978addb5a52f2b4cd9d91eafa7f0ab959d # v4.2.0
+        with:
+          install: true
+          cache: true
+          working_directory: provisioner
+      - name: CVE scan (govulncheck + trivy fs)
+        run: make cve-scan
 
   # Drift gate: the committed k8s/postgresql manifest is generated from the pinned
   # Authentik Helm chart + values.yml. Fail if it's stale (e.g. a Renovate chart
@@ -246,8 +270,20 @@ jobs:
   # the tagged commit. GHCR auth uses the built-in GITHUB_TOKEN (no operator secret).
   # Cosign signing / richer SBOM attestation are a `/harden-image-pipeline` follow-up.
   publish:
-    needs: [build, test, docker]
-    if: ${{ !failure() && !cancelled() && startsWith(github.ref, 'refs/tags/') }}
+    needs: [changes, static-check, build, test, docker, security]
+    # Gate on EXPLICIT success of every prerequisite, NOT `!failure()`. A SKIPPED
+    # need (build/test/docker/security skip when static-check fails/flakes on the
+    # tagged commit) is neither `failure` nor `cancelled`, and `failure()` does NOT
+    # reliably propagate a transitive ancestor's failure — so `!failure()` would let
+    # publish push an UNSCANNED image. `result == 'success'` closes that bypass.
+    # RED-proof: tag a commit with a deliberate static-check failure → publish must skip.
+    if: >-
+      ${{ startsWith(github.ref, 'refs/tags/')
+          && needs.static-check.result == 'success'
+          && needs.build.result == 'success'
+          && needs.test.result == 'success'
+          && needs.docker.result == 'success'
+          && needs.security.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -284,7 +320,7 @@ jobs:
 
   ci-pass:
     if: always()
-    needs: [changes, static-check, build, test, docker, k8s-drift, e2e, e2e-kind, e2e-forward-auth-browser, mermaid-lint, publish]
+    needs: [changes, static-check, build, test, docker, security, k8s-drift, e2e, e2e-kind, e2e-forward-auth-browser, mermaid-lint, publish]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:

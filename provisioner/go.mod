@@ -1,6 +1,6 @@
 module github.com/AndriyKalashnykov/authentik-k8s/provisioner
 
-go 1.26.4
+go 1.26.5
 
 require (
 	github.com/go-openapi/runtime v0.32.4
