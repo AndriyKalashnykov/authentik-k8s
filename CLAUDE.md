@@ -2,6 +2,31 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Working method — adversary loop (BLOCKING for non-trivial changes)
+
+For any change here that embeds a **design decision, a premise, or a claim about the world**, follow the
+**`/adversary-loop`** discipline: draft the idea → run it past the relevant read-only adversary *before*
+building → incorporate → implement → run the implementation past the adversary → incorporate. Dispatch
+**synchronously or via a Workflow schema** (never fire-and-forget); adversaries are read-only (enforced by
+the `subagent-readonly` PreToolUse hook + `isolation:"worktree"`, not by the brief). Full mechanism:
+`rules/common/agents.md` §"Adversary roster + deliverability-guaranteed dispatch".
+
+Adversaries most relevant to this repo (dispatch by name, or inline the persona when a fresh session hasn't
+registered them):
+
+| Surface here | Adversary |
+|---|---|
+| Authentik provider/outpost/flow wiring, forward-auth, bootstrap-token drift, redirect-only "verification" | `adversary-identity-auth` |
+| `provisioner/` Go code + tests | `adversary-go` |
+| `k8s/` manifests, KinD e2e, PSA, `securityContext`, image drift | `adversary-k8s` |
+| Makefile / CI / `e2e/` scripts, `.env`/gate correctness | `adversary-bash-git-cli` |
+| secrets, CVE gates, `.env`/selector clobber | `adversary-security-secrets` |
+
+**SKIP** (no premise to refute — skipping is not a bypass): a Renovate/version bump, a doc/comment typo, a
+pure rename/move, a formatter/lint autofix, a test-only addition with no new contract, or any change whose
+only claim is "it builds/renders." Mandating the loop on trivia trains the skip reflex and kills it — scope
+it to real decisions.
+
 ## What this repo is
 
 A proof-of-concept for driving [Authentik](https://goauthentik.io/) programmatically via its
