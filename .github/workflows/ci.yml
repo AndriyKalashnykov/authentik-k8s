@@ -180,9 +180,13 @@ jobs:
 
   # Live e2e: stand up Authentik via Docker Compose, provision + verify with the
   # Go POC, tear down. No secrets needed (demo bootstrap token from .env.example).
+  # RELEASE-TIME ONLY (version tags) — same posture as docker/security: the heavy
+  # live-infra jobs are kept off the PR path. `publish` gates on this job's explicit
+  # success, so it still blocks a release; it no longer blocks a merge.
+  # The workflow_dispatch arm keeps a pre-merge escape hatch: `gh workflow run ci.yml --ref <branch>`.
   e2e:
     needs: [changes, build, test]
-    if: ${{ !failure() && !cancelled() && needs.changes.outputs.code == 'true' }}
+    if: ${{ !failure() && !cancelled() && (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -204,9 +208,10 @@ jobs:
   # headless browser (Playwright) and assert whoami serves the X-authentik-* identity
   # headers — the end-user outcome, not just the redirect. Compose-class infra (same
   # as the e2e job) plus node (from .mise.toml) + chromium.
+  # RELEASE-TIME ONLY (version tags) — see the e2e job's note; `publish` gates on it.
   e2e-forward-auth-browser:
     needs: [changes, build, test]
-    if: ${{ !failure() && !cancelled() && needs.changes.outputs.code == 'true' }}
+    if: ${{ !failure() && !cancelled() && (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -228,11 +233,18 @@ jobs:
   # Full KinD e2e: create a KinD cluster + cloud-provider-kind, deploy the real
   # k8s/postgresql manifests, provision + verify via the Go POC against the
   # LoadBalancer, tear down. Catches manifest-wiring regressions (Service selector,
-  # PGDATA mount, Secret wiring) the Compose e2e can't see. Heavier (~10-15 min);
-  # runs on code OR k8s changes (the k8s filter now covers all of k8s/**).
+  # PGDATA mount, Secret wiring) the Compose e2e can't see. Heavier (~10-15 min).
+  # RELEASE-TIME ONLY (version tags) — see the e2e job's note; `publish` gates on it.
+  # TRADE-OFF, stated plainly: this is the ONLY job that exercises the real k8s
+  # manifests against a cluster, so a manifest-wiring regression now merges green and
+  # is caught at tag time instead of on the PR. k8s-drift (helm-render diff) still runs
+  # on every k8s change, but it compares text — it cannot see a wiring break.
+  # To validate manifests before merging, dispatch this workflow on the branch —
+  # the `workflow_dispatch` arm below exists precisely so that escape hatch works:
+  #   gh workflow run ci.yml --ref <branch>
   e2e-kind:
     needs: [changes, build, test]
-    if: ${{ !failure() && !cancelled() && (needs.changes.outputs.code == 'true' || needs.changes.outputs.k8s == 'true') }}
+    if: ${{ !failure() && !cancelled() && (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     defaults:
@@ -266,11 +278,14 @@ jobs:
         run: make mermaid-lint
 
   # Release publish: on a version tag (v*), build the provisioner image and push it
-  # to GHCR — only after the PR-path validators (build + test + image scan) pass on
-  # the tagged commit. GHCR auth uses the built-in GITHUB_TOKEN (no operator secret).
+  # to GHCR — only after every validator (static-check + build + test + image scan +
+  # CVE scan + all three live e2e jobs) passes on the tagged commit. The e2e jobs are
+  # tag-only, so this gate is now the ONLY thing enforcing them: without them listed
+  # here they would run at tag time and block nothing.
+  # GHCR auth uses the built-in GITHUB_TOKEN (no operator secret).
   # Cosign signing / richer SBOM attestation are a `/harden-image-pipeline` follow-up.
   publish:
-    needs: [changes, static-check, build, test, docker, security]
+    needs: [changes, static-check, build, test, docker, security, e2e, e2e-kind, e2e-forward-auth-browser]
     # Gate on EXPLICIT success of every prerequisite, NOT `!failure()`. A SKIPPED
     # need (build/test/docker/security skip when static-check fails/flakes on the
     # tagged commit) is neither `failure` nor `cancelled`, and `failure()` does NOT
@@ -283,7 +298,10 @@ jobs:
           && needs.build.result == 'success'
           && needs.test.result == 'success'
           && needs.docker.result == 'success'
-          && needs.security.result == 'success' }}
+          && needs.security.result == 'success'
+          && needs.e2e.result == 'success'
+          && needs.e2e-kind.result == 'success'
+          && needs.e2e-forward-auth-browser.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
