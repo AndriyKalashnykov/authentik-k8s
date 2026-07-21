@@ -290,15 +290,29 @@ e2e-forward-auth: deps
 	 }
 
 #e2e-forward-auth-browser: @ E2E: real browser completes the Authentik login -> whoami serves identity headers -> down (Playwright)
+# node/npm/npx are mise-managed (node is pinned in .mise.toml, which lives HERE) but are
+# invoked after `cd $(BROWSER_E2E_DIR)` — a directory OUTSIDE this one, with no mise config
+# above it. So the old `command -v node` guard checked node HERE and the recipe used node
+# THERE: a guard that cannot vouch for the thing it guards. Since mise-action v4.2.1 puts
+# SHIMS on PATH (upstream b107e20a stopped exporting mise env's PATH), a shim resolves its
+# version from the config applying to the CURRENT directory — which is why the sibling
+# `secrets` target broke the same way.
+# Fix: resolve node's real bin dir BEFORE leaving and prepend it to PATH, so node AND the
+# npm/npx that internally re-invoke it all resolve cwd-independently.
+# NOTE: this is defensive, not a repair of an observed break — CI currently passes here
+# (see the PR), so no RED was demonstrated for this target; the guard/use mismatch is the
+# defect being fixed.
 e2e-forward-auth-browser: deps
-	@command -v node >/dev/null 2>&1 || { echo "node missing — run 'make deps' (node is pinned in .mise.toml)"; exit 1; }
-	@trap '$(COMPOSE_FA) down -v >/dev/null 2>&1 || true' EXIT INT TERM; \
-	 $(MAKE) --no-print-directory compose-forward-auth-up && { \
-	   set -a; . $(COMPOSE_DIR)/.env; set +a; \
-	   cd $(BROWSER_E2E_DIR) && npm ci && npx playwright install $(PLAYWRIGHT_BROWSER_DEPS) chromium && \
-	   APP_URL=$(WHOAMI_URL)/ AK_ADMIN_USER=$(AK_ADMIN_USER) AK_ADMIN_PASS="$$AUTHENTIK_BOOTSTRAP_PASSWORD" \
-	   npx playwright test; \
-	 }
+	@NODE_BIN="$$(mise which node 2>/dev/null || command -v node)"; \
+	[ -x "$$NODE_BIN" ] || { echo "node missing — run 'make deps' (node is pinned in .mise.toml)"; exit 1; }; \
+	PATH="$$(dirname "$$NODE_BIN"):$$PATH"; export PATH; \
+	trap '$(COMPOSE_FA) down -v >/dev/null 2>&1 || true' EXIT INT TERM; \
+	$(MAKE) --no-print-directory compose-forward-auth-up && { \
+	  set -a; . $(COMPOSE_DIR)/.env; set +a; \
+	  cd $(BROWSER_E2E_DIR) && npm ci && npx playwright install $(PLAYWRIGHT_BROWSER_DEPS) chromium && \
+	  APP_URL=$(WHOAMI_URL)/ AK_ADMIN_USER=$(AK_ADMIN_USER) AK_ADMIN_PASS="$$AUTHENTIK_BOOTSTRAP_PASSWORD" \
+	  npx playwright test; \
+	}
 
 # ---------------------------------------------------------------------------
 # End-to-end test (build-tagged Go test against a live Authentik)
