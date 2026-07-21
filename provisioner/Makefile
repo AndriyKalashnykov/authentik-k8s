@@ -141,7 +141,8 @@ cve-scan: vulncheck trivy-fs
 # `mise which` prints the absolute install path, which is cwd-independent.
 secrets: deps
 	@GITLEAKS="$$(mise which gitleaks 2>/dev/null || command -v gitleaks)"; \
-	[ -x "$$GITLEAKS" ] || { echo "ERROR: gitleaks not found; run 'make deps'"; exit 1; }; \
+	case "$$GITLEAKS" in */mise/shims/*) GITLEAKS="";; esac; \
+	[ -x "$$GITLEAKS" ] || { echo "ERROR: could not resolve a real gitleaks binary (a mise SHIM is not usable here — it is cwd-dependent); run 'make deps'"; exit 1; }; \
 	cd .. && "$$GITLEAKS" detect --no-git --source . -c .gitleaks.toml --redact --no-banner
 
 #mermaid-lint: @ Validate README/CLAUDE Mermaid diagrams render cleanly (minlag/mermaid-cli)
@@ -312,7 +313,8 @@ e2e-forward-auth: deps
 # relative paths are correct. Do NOT flatten it back to a bare `cd`.
 e2e-forward-auth-browser: deps
 	@NODE_BIN="$$(mise which node 2>/dev/null || command -v node)"; \
-	[ -x "$$NODE_BIN" ] || { echo "node missing — run 'make deps' (node is pinned in .mise.toml)"; exit 1; }; \
+	case "$$NODE_BIN" in */mise/shims/*) NODE_BIN="";; esac; \
+	[ -x "$$NODE_BIN" ] || { echo "could not resolve a real node binary (a mise SHIM is not usable here — it is cwd-dependent, and prepending the shims dir is a no-op); run 'make deps'"; exit 1; }; \
 	PATH="$$(dirname "$$NODE_BIN"):$$PATH"; export PATH; \
 	trap '$(COMPOSE_FA) down -v >/dev/null 2>&1 || true' EXIT INT TERM; \
 	$(MAKE) --no-print-directory compose-forward-auth-up && { \

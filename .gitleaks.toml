@@ -1,26 +1,42 @@
 # gitleaks config for the `secrets` Make target (scans the CURRENT working tree:
-# `gitleaks detect --no-git`). This repo is a POC whose .env.example / k8s
-# manifests / main.go fallback consts intentionally ship DEMO credentials
-# (documented as "rotate for real use"). They are allowlisted below so the gate
-# still catches a REAL accidental leak anywhere else (code, scripts, compose).
+# `gitleaks detect --no-git`). This POC intentionally ships DEMO credentials in
+# .env.example, the k8s manifests, and main.go fallback consts (documented as
+# "rotate for real use").
+#
+# They are pinned BY VALUE, never by whole-file path. That distinction is
+# load-bearing. A `paths` entry is a WHOLE-FILE SKIP -- gitleaks never opens the
+# file. This config previously skipped every k8s/**.ya?ml and every .env*, and a
+# RED-proof showed the gate reporting "no leaks found" (rc=0) with freshly planted
+# real-format GitHub PATs sitting in those files. ~10% of the repo (~25 KB,
+# including every committed manifest) was never read, and the "bytes scanned"
+# figure could not move when a secret was added there -- a gate that passed by not
+# looking. Value-pinning keeps the known demo credentials quiet while the files
+# themselves stay scanned.
+#
+# Do NOT re-add `paths` to silence a new finding: pin the VALUE, or fix the leak.
 [extend]
 useDefault = true
 
-[allowlist]
-description = "Intentional committed demo credentials (rotate for real deployments)"
-# Whole-file demo-credential sources:
-#  - .env / .env.example: the committed config source-of-truth + local overrides
-#  - k8s/**.y(a)ml: Helm-generated Authentik manifests; the only 'secrets' are the
-#    demo `authentik` Secret and base64 of non-secrets (service names, db names)
-paths = [
-    '''(^|/)\.env(\.example)?$''',
-    '''^k8s/.+\.ya?ml$''',
-]
-# main.go ships the same demo tokens as fallback defaults (mirroring .env.example);
-# allowlist the exact values so the rest of the Go code is still scanned.
+[[allowlists]]
+description = "Intentional committed demo credentials -- pinned by VALUE so the files stay scanned"
+regexTarget = "secret"
 regexes = [
     '''NoMlxBQuYgfu3j19ygGqhjXenAjrJgOfN5naqmSDBUhdLjYqHKze7yyzY07H''',
     '''ZId4CDEtmHbnuxkJH2ehUzHgYeTmOansuCO0JsTTsZnYB1z9N0WoAutpyH4i''',
     '''e3qVF1uGTL5DKjglvMKpDYk60X7s89jnbNh9nPEpFYzSgoOHYDSMi0xxYhYr''',
     '''svkH90FMYlnXPA5JHxePVQkozTjXReT6rsdQ2BXedwI5mtrFYR5mfrunMt4B''',
+    '''ZnIogyvvZGZRKPNwYjYLNbfJGMyAIi4fYMLvERevXshb81f5X3''',
+    '''VGhpc0lzTm90QVNlY3VyZVBhc3N3b3Jk''',
+    '''UGxlYXNlR2VuZXJhdGVBNTBDaGFyS2V5''',
+    '''8a8fbfa0415ad55b7e7bb43916ce5552ccca1b8877057d348017acf03f11dbba''',
+]
+
+# The Helm-rendered pod templates carry `checksum/secret: <sha256>` annotations.
+# That is a HASH OF the rendered Secret (used to force a rollout), not a credential.
+# Suppressed by LINE so the rest of the manifest stays scanned.
+[[allowlists]]
+description = "Helm checksum/secret annotation: a sha of the rendered Secret, not a credential"
+regexTarget = "line"
+regexes = [
+    '''checksum/secret:''',
 ]

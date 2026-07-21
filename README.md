@@ -289,7 +289,8 @@ Run `make help` for the full list. Common targets:
 | `make lint-docker` | Lint the Dockerfile with hadolint |
 | `make vulncheck` | Scan dependencies with govulncheck |
 | `make compose-lint` | Lint the Compose file with dclint (rules in `.dclintrc.yaml`) |
-| `make static-check` | Composite gate: alignment + lint + hadolint + mermaid + compose + vulncheck + trivy-fs + secrets |
+| `make static-check` | Composite gate: alignment + lint + hadolint + mermaid + compose + secrets |
+| `make cve-scan` | govulncheck + Trivy filesystem scan — **not** in `static-check`; run before cutting a release |
 | `make image-build` / `make image-run` | Build / run the distroless container image |
 | `make image-scan` | Build the image and scan it for HIGH/CRITICAL CVEs (Trivy) |
 | `make compose-up` / `make compose-down` | Start / stop the Authentik Compose stack |
