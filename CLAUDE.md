@@ -66,7 +66,8 @@ make -C provisioner kind-up      # Kubernetes: KinD + cloud-provider-kind, appli
 cd provisioner
 cp .env.example .env   # one-time: per-dev config (gitignored); main.go also has the same fallbacks
 make deps     # install mise (if missing) + pinned Go/golangci-lint/govulncheck/hadolint/kind/kubectl
-make ci       # full local pipeline: static-check (align+lint+hadolint+mermaid+compose+vulncheck+trivy-fs+secrets) + test + build
+make ci       # full local pipeline: static-check (align+lint+hadolint+mermaid+compose+secrets) + test + build
+make cve-scan # govulncheck + trivy fs — NOT part of static-check/ci; run before cutting a release
 make run      # run the POC against a running Authentik (sources .env.example then .env)
 make test     # go test ./...  (unit + hermetic httptest contract tests)
 make image-build / image-run   # build/run the POC container (config via --env-file)

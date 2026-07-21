@@ -141,7 +141,8 @@ cve-scan: vulncheck trivy-fs
 # `mise which` prints the absolute install path, which is cwd-independent.
 secrets: deps
 	@GITLEAKS="$$(mise which gitleaks 2>/dev/null || command -v gitleaks)"; \
-	[ -x "$$GITLEAKS" ] || { echo "ERROR: gitleaks not found; run 'make deps'"; exit 1; }; \
+	case "$$GITLEAKS" in */mise/shims/*) GITLEAKS="";; esac; \
+	[ -x "$$GITLEAKS" ] || { echo "ERROR: could not resolve a real gitleaks binary (a mise SHIM is not usable here — it is cwd-dependent); run 'make deps'"; exit 1; }; \
 	cd .. && "$$GITLEAKS" detect --no-git --source . -c .gitleaks.toml --redact --no-banner
 
 #mermaid-lint: @ Validate README/CLAUDE Mermaid diagrams render cleanly (minlag/mermaid-cli)
@@ -290,15 +291,38 @@ e2e-forward-auth: deps
 	 }
 
 #e2e-forward-auth-browser: @ E2E: real browser completes the Authentik login -> whoami serves identity headers -> down (Playwright)
+# node/npm/npx are mise-managed (node is pinned in .mise.toml, which lives HERE) but are
+# invoked after `cd $(BROWSER_E2E_DIR)` — a directory OUTSIDE this one, with no mise config
+# above it. So the old `command -v node` guard checked node HERE and the recipe used node
+# THERE: a guard that cannot vouch for the thing it guards. Since mise-action v4.2.1 puts
+# SHIMS on PATH (upstream b107e20a stopped exporting mise env's PATH), a shim resolves its
+# version from the config applying to the CURRENT directory — which is why the sibling
+# `secrets` target broke the same way.
+# Fix: resolve node's real bin dir BEFORE leaving and prepend it to PATH, so node AND the
+# npm/npx that internally re-invoke it all resolve cwd-independently.
+# NOTE: the node resolution above is defensive — CI passes this target today, so no RED was
+# demonstrated for it; the guard/use mismatch is the defect being fixed.
+#
+# The `( ... )` subshell around the cd, by contrast, fixes a MEASURED leak. The EXIT trap
+# runs in THIS shell, and a bare `cd $(BROWSER_E2E_DIR)` left that shell in e2e/browser — so
+# the trap's `$(COMPOSE_FA)` relative paths resolved to e2e/compose/docker-compose.yml
+# (nonexistent), `docker compose down` failed, and `|| true` swallowed it. Every run leaked
+# the whole stack (5 containers + volumes) silently. Verified: running the trap's exact
+# command from e2e/browser errors with "open .../e2e/compose/docker-compose.yml: no such
+# file or directory". The subshell keeps the trap's cwd at provisioner/, where those
+# relative paths are correct. Do NOT flatten it back to a bare `cd`.
 e2e-forward-auth-browser: deps
-	@command -v node >/dev/null 2>&1 || { echo "node missing — run 'make deps' (node is pinned in .mise.toml)"; exit 1; }
-	@trap '$(COMPOSE_FA) down -v >/dev/null 2>&1 || true' EXIT INT TERM; \
-	 $(MAKE) --no-print-directory compose-forward-auth-up && { \
-	   set -a; . $(COMPOSE_DIR)/.env; set +a; \
-	   cd $(BROWSER_E2E_DIR) && npm ci && npx playwright install $(PLAYWRIGHT_BROWSER_DEPS) chromium && \
-	   APP_URL=$(WHOAMI_URL)/ AK_ADMIN_USER=$(AK_ADMIN_USER) AK_ADMIN_PASS="$$AUTHENTIK_BOOTSTRAP_PASSWORD" \
-	   npx playwright test; \
-	 }
+	@NODE_BIN="$$(mise which node 2>/dev/null || command -v node)"; \
+	case "$$NODE_BIN" in */mise/shims/*) NODE_BIN="";; esac; \
+	[ -x "$$NODE_BIN" ] || { echo "could not resolve a real node binary (a mise SHIM is not usable here — it is cwd-dependent, and prepending the shims dir is a no-op); run 'make deps'"; exit 1; }; \
+	PATH="$$(dirname "$$NODE_BIN"):$$PATH"; export PATH; \
+	trap '$(COMPOSE_FA) down -v >/dev/null 2>&1 || true' EXIT INT TERM; \
+	$(MAKE) --no-print-directory compose-forward-auth-up && { \
+	  set -a; . $(COMPOSE_DIR)/.env; set +a; \
+	  ( cd $(BROWSER_E2E_DIR) && npm ci && npx playwright install $(PLAYWRIGHT_BROWSER_DEPS) chromium && \
+	    APP_URL=$(WHOAMI_URL)/ AK_ADMIN_USER=$(AK_ADMIN_USER) AK_ADMIN_PASS="$$AUTHENTIK_BOOTSTRAP_PASSWORD" \
+	    npx playwright test ); \
+	}
 
 # ---------------------------------------------------------------------------
 # End-to-end test (build-tagged Go test against a live Authentik)

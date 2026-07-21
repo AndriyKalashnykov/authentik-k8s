@@ -118,7 +118,7 @@ jobs:
   # on every PR; this builds + scans the actual image before a tag ships.
   docker:
     needs: [changes, static-check]
-    if: ${{ !failure() && !cancelled() && startsWith(github.ref, 'refs/tags/') }}
+    if: ${{ !failure() && !cancelled() && (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -140,7 +140,7 @@ jobs:
   # deps + the Go toolchain current between releases.
   security:
     needs: [changes, static-check]
-    if: ${{ !failure() && !cancelled() && startsWith(github.ref, 'refs/tags/') }}
+    if: ${{ !failure() && !cancelled() && (startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     defaults:
@@ -159,9 +159,13 @@ jobs:
   # Drift gate: the committed k8s/postgresql manifest is generated from the pinned
   # Authentik Helm chart + values.yml. Fail if it's stale (e.g. a Renovate chart
   # bump without a regen). helm-only (template + diff) — no cluster needed.
+  # Also runs on a TAG: paths-filter diffs against the default branch, so on a tag
+  # pointing at main HEAD it reports k8s == 'false' and this gate would be skipped —
+  # letting a release ship with the committed manifest stale against the pinned chart.
+  # `publish` gates on it explicitly for the same reason.
   k8s-drift:
     needs: [changes]
-    if: ${{ !failure() && !cancelled() && needs.changes.outputs.k8s == 'true' }}
+    if: ${{ !failure() && !cancelled() && (needs.changes.outputs.k8s == 'true' || startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch') }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     defaults:
@@ -285,7 +289,7 @@ jobs:
   # GHCR auth uses the built-in GITHUB_TOKEN (no operator secret).
   # Cosign signing / richer SBOM attestation are a `/harden-image-pipeline` follow-up.
   publish:
-    needs: [changes, static-check, build, test, docker, security, e2e, e2e-kind, e2e-forward-auth-browser]
+    needs: [changes, static-check, build, test, docker, security, k8s-drift, e2e, e2e-kind, e2e-forward-auth-browser]
     # Gate on EXPLICIT success of every prerequisite, NOT `!failure()`. A SKIPPED
     # need (build/test/docker/security skip when static-check fails/flakes on the
     # tagged commit) is neither `failure` nor `cancelled`, and `failure()` does NOT
@@ -299,6 +303,7 @@ jobs:
           && needs.test.result == 'success'
           && needs.docker.result == 'success'
           && needs.security.result == 'success'
+          && needs.k8s-drift.result == 'success'
           && needs.e2e.result == 'success'
           && needs.e2e-kind.result == 'success'
           && needs.e2e-forward-auth-browser.result == 'success' }}
