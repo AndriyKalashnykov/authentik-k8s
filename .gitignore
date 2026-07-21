@@ -3,3 +3,10 @@
 */.env
 bin/
 !.env.example
+# Claude Code local state: settings.local.json holds machine-local permission
+# approvals, and worktrees/ holds full nested COPIES of this repo created for
+# isolated subagents. Neither belongs in git — and the nested copies would
+# otherwise be walked by tree-scanning gates (`make secrets` runs gitleaks with
+# --no-git, i.e. over the working tree), inflating scans and reporting findings
+# from a duplicate of the repo.
+.claude/
