@@ -130,8 +130,19 @@ cve-scan: vulncheck trivy-fs
 	@echo "CVE scan passed."
 
 #secrets: @ Scan the working tree for leaked secrets (gitleaks; demo creds allowlisted in .gitleaks.toml)
+# The scan MUST run with cwd = repo root: gitleaks reports finding paths relative to cwd, and
+# .gitleaks.toml anchors its allowlist at the scan root (`^k8s/.+\.ya?ml$`, `(^|/)\.env…`).
+# Running it from here with `--source ..` instead yields `../k8s/…`, which those anchors miss —
+# measured: 4 intentional demo credentials resurface as "leaks".
+# But mise's config lives HERE (provisioner/.mise.toml; there is no root-level mise config), so
+# the binary must be resolved BEFORE leaving this directory. Once mise-action puts SHIMS on PATH
+# (v4.2.1+, upstream b107e20a "exclude PATH from environment export"), a shim invoked from the
+# repo root cannot resolve a version -> `mise ERROR No version is set for shim: gitleaks`.
+# `mise which` prints the absolute install path, which is cwd-independent.
 secrets: deps
-	@cd .. && gitleaks detect --no-git --source . -c .gitleaks.toml --redact --no-banner
+	@GITLEAKS="$$(mise which gitleaks 2>/dev/null || command -v gitleaks)"; \
+	[ -x "$$GITLEAKS" ] || { echo "ERROR: gitleaks not found; run 'make deps'"; exit 1; }; \
+	cd .. && "$$GITLEAKS" detect --no-git --source . -c .gitleaks.toml --redact --no-banner
 
 #mermaid-lint: @ Validate README/CLAUDE Mermaid diagrams render cleanly (minlag/mermaid-cli)
 mermaid-lint:
