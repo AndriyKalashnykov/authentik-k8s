@@ -33,7 +33,7 @@ HELM_REPO_URL     := https://charts.goauthentik.io
 # k8s manifest is regenerated from this chart + k8s/postgresql/values.yml; a CI
 # drift gate (k8s-drift) fails if they're out of sync. Chart version == app version.
 # renovate: datasource=helm depName=authentik registryUrl=https://charts.goauthentik.io
-AUTHENTIK_CHART_VERSION := 2026.5.5
+AUTHENTIK_CHART_VERSION := 2026.5.6
 # Track the REGISTRY image (the consumed sink), not the GitHub release: registry.k8s.io
 # image promotion lags the upstream release, so github-releases proposes un-pullable tags.
 # The `# renovate:` line MUST stay immediately above the constant (customManager adjacency).
