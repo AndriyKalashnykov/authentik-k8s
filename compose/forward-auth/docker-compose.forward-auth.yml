@@ -42,7 +42,7 @@ services:
       - server
 
   whoami:
-    image: traefik/whoami:v1.11.0@sha256:200689790a0a0ea48ca45992e0450bc26ccab5307375b41c84dfc4f2475937ab
+    image: traefik/whoami:v1.12.0@sha256:c4717a8d1f0134a7444e24f881160e033991f23027c6c5a9a3f8fd22e70d1d44
     restart: unless-stopped
     labels:
       - traefik.enable=true
