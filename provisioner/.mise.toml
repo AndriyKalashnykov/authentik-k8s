@@ -9,7 +9,7 @@ go = "1.26.5"
 "aqua:hadolint/hadolint" = "2.14.0"
 # Local Kubernetes (KinD e2e). cloud-provider-kind runs as a pinned host
 # container (see Makefile CLOUD_PROVIDER_KIND_VERSION), not a mise tool.
-"aqua:kubernetes-sigs/kind" = "0.32.0"
+"aqua:kubernetes-sigs/kind" = "0.33.0"
 "aqua:kubernetes/kubectl" = "1.36.2"
 # Helm — used by `make k8s-generate` to regenerate k8s/postgresql from the pinned
 # Authentik chart (templating only; no cluster needed).
