@@ -3,7 +3,7 @@
 # ARG GO_VERSION (enforced by `make check-toolchain-alignment`).
 go = "1.26.5"
 # Lint + vuln tools (Go).
-"aqua:golangci/golangci-lint" = "2.12.2"
+"aqua:golangci/golangci-lint" = "2.13.2"
 "go:golang.org/x/vuln/cmd/govulncheck" = "1.6.0"
 # Dockerfile linter.
 "aqua:hadolint/hadolint" = "2.14.0"
