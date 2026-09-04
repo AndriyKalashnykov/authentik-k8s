@@ -1,7 +1,7 @@
 [tools]
 # Go version MUST match the `go` directive in go.mod AND the Dockerfile's
 # ARG GO_VERSION (enforced by `make check-toolchain-alignment`).
-go = "1.26.5"
+go = "1.27.1"
 # Lint + vuln tools (Go).
 "aqua:golangci/golangci-lint" = "2.12.2"
 "go:golang.org/x/vuln/cmd/govulncheck" = "1.6.0"
