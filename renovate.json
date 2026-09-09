@@ -100,10 +100,10 @@
       "minimumReleaseAge": "3 days"
     },
     {
-      "description": "Lock kubectl to the cluster node's minor line (kindest/node v1.36.x). CI runs no live e2e, so it cannot catch kubectl<->apiserver skew — this constraint is the only guard. Matches by packageName (the mise aqua depName is `aqua:kubernetes/kubectl`, but packageName resolves to `kubernetes/kubectl`). Bump it together with kind + kindest/node when the cluster moves to a new minor.",
+      "description": "Lock kubectl to the cluster node's minor line (kindest/node v1.37.x). CI runs no live e2e, so it cannot catch kubectl<->apiserver skew — this constraint is the only guard. Matches by packageName (the mise aqua depName is `aqua:kubernetes/kubectl`, but packageName resolves to `kubernetes/kubectl`). Bump it together with kind + kindest/node when the cluster moves to a new minor.",
       "matchManagers": ["mise"],
       "matchPackageNames": ["kubernetes/kubectl"],
-      "allowedVersions": "/^1\\.36\\./"
+      "allowedVersions": "/^1\\.37\\./"
     },
     {
       "description": "Custom.regex docker pins (env-file AUTHENTIK_TAG, Makefile cloud-provider-kind) are bare tags/versions, not pullable image refs, so docker:pinDigests cannot render a write for them — disable it. Production-runtime pins via the built-in dockerfile/docker-compose/kubernetes managers keep their digests.",
