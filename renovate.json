@@ -21,7 +21,7 @@
   "labels": ["dependencies"],
   "prConcurrentLimit": 50,
   "prHourlyLimit": 0,
-  "automerge": false,
+  "automerge": true,
   "postUpdateOptions": ["gomodTidy"],
   "kubernetes": {
     "managerFilePatterns": ["/k8s/postgresql/oss-datastores\\.yml$/"]
@@ -137,9 +137,20 @@
       "groupName": "Authentik"
     },
     {
-      "description": "Group the two postgres pins so they bump as one PR: the compose stack (docker-compose, docker.io/library/postgres) and the OSS k8s datastore (kubernetes, postgres). NOTE: a k8s postgres bump also requires `make k8s-generate` because oss-datastores.yml is concatenated into the committed authentik-postgresql.yml — the k8s-drift gate reddens the PR until it's regenerated (automerge is off, so a human runs it).",
+      "description": "Group the two postgres pins so they bump as one PR: the compose stack (docker-compose, docker.io/library/postgres) and the OSS k8s datastore (kubernetes, postgres). NOTE: a k8s postgres bump also requires `make k8s-generate` because oss-datastores.yml is concatenated into the committed authentik-postgresql.yml — the k8s-drift gate reddens the PR until it's regenerated. That red is also what stops automerge landing a stale manifest, so such a PR always waits for a human to run `make k8s-generate` and push.",
       "matchPackageNames": ["postgres", "docker.io/library/postgres"],
       "groupName": "postgresql"
+    },
+    {
+      "description": "Keep golangci-lint in the `go toolchain` group. golangci-lint refuses to run when the Go version it was BUILT with is older than the Go version it is asked to target, so the two are version-locked and must land as one PR — a split produces two individually-unmergeable PRs (see the allowedVersions hold below).",
+      "matchPackageNames": ["golangci/golangci-lint"],
+      "groupName": "go toolchain"
+    },
+    {
+      "description": "HOLD the Go toolchain below 1.27 until golangci-lint ships a release built with Go 1.27. golangci-lint aborts with \"the Go language version (go1.26) used to build golangci-lint is lower than the targeted Go version (1.27.1)\", which reddens static-check, so a Go 1.27 PR can never go green on its own. Measured 2026-09-09: the newest release v2.13.2 (2026-08-27) still declares `go 1.26.0` in its go.mod. REMOVE THIS CAP once a golangci-lint release is built with Go 1.27+ — the `go toolchain` group above then lands both together. This is a hold with an expiry condition, not a permanent pin.",
+      "matchManagers": ["gomod", "mise", "dockerfile"],
+      "matchDepNames": ["go", "golang"],
+      "allowedVersions": "<1.27.0"
     }
   ]
 }
