@@ -173,7 +173,7 @@ compose-lint:
 	@echo "compose-lint: OK"
 
 #static-check: @ Composite quality gate (alignment + lint + hadolint + mermaid + compose + secrets). CVE scans (vulncheck + trivy-fs) run on release tags only — see cve-scan.
-static-check: deps check-toolchain-alignment lint lint-docker mermaid-lint compose-lint secrets
+static-check: deps check-toolchain-alignment lint lint-docker mermaid-lint compose-lint renovate-validate secrets
 	@echo "Static check passed."
 
 #image-build: @ Build the POC container image

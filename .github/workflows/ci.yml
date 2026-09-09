@@ -50,6 +50,7 @@ jobs:
               - 'e2e/**'
               - '.dclintrc.yaml'
               - '.gitleaks.toml'
+              - 'renovate.json'
             docs:
               - 'README.md'
             k8s:
