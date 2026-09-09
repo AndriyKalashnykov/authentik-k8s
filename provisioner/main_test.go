@@ -17,7 +17,7 @@ const (
 	bodyGroup = `{"pk":"group-uuid-1","num_pk":1,"name":"g-admins","parents_obj":[],"users_obj":[],"roles_obj":[],"inherited_roles_obj":[],"children":[],"children_obj":[]}`
 	bodyUser  = `{"pk":42,"username":"alice","name":"alice","date_joined":"2024-01-01T00:00:00Z","is_superuser":false,"groups_obj":[],"roles_obj":[],"avatar":"","uid":"u1","uuid":"uu1","password_change_date":"2024-01-01T00:00:00Z","last_updated":"2024-01-01T00:00:00Z"}`
 	bodyToken = `{"pk":"tok-pk","identifier":"alice-token","user_obj":{"pk":42,"username":"alice","name":"alice","date_joined":"2024-01-01T00:00:00Z","is_superuser":false,"groups_obj":[],"roles_obj":[],"avatar":"","uid":"u1","uuid":"uu1","password_change_date":"2024-01-01T00:00:00Z","last_updated":"2024-01-01T00:00:00Z"}}`
-	bodyMe    = `{"user":{"pk":42,"username":"alice","name":"alice","uid":"u1","avatar":"","is_active":true,"is_superuser":false,"groups":[{"pk":"group-uuid-1","name":"g-admins"}],"roles":[],"settings":{},"system_permissions":[]}}`
+	bodyMe    = `{"user":{"pk":42,"username":"alice","name":"alice","uid":"u1","avatar":"","is_active":true,"is_superuser":false,"is_current":true,"groups":[{"pk":"group-uuid-1","name":"g-admins"}],"roles":[],"settings":{},"system_permissions":[]},"users":[{"pk":42,"username":"alice","name":"alice","uid":"u1","avatar":"","is_active":true,"is_superuser":false,"is_current":true,"groups":[{"pk":"group-uuid-1","name":"g-admins"}],"roles":[],"settings":{},"system_permissions":[]}]}`
 )
 
 func viewKeyBody(key string) string { return `{"key":"` + key + `"}` }

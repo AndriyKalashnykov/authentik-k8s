@@ -227,7 +227,7 @@ func TestMeRetrieveUser(t *testing.T) {
 	var method, path string
 	client := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 		method, path = r.Method, r.URL.Path
-		writeJSON(t, w, http.StatusOK, `{"user":{"pk":42,"username":"alice","name":"alice","uid":"u1","avatar":"","is_active":true,"is_superuser":false,"groups":[{"pk":"group-uuid-1","name":"admins"}],"roles":[],"settings":{},"system_permissions":[]}}`)
+		writeJSON(t, w, http.StatusOK, `{"user":{"pk":42,"username":"alice","name":"alice","uid":"u1","avatar":"","is_active":true,"is_superuser":false,"is_current":true,"groups":[{"pk":"group-uuid-1","name":"admins"}],"roles":[],"settings":{},"system_permissions":[]},"users":[{"pk":42,"username":"alice","name":"alice","uid":"u1","avatar":"","is_active":true,"is_superuser":false,"is_current":true,"groups":[{"pk":"group-uuid-1","name":"admins"}],"roles":[],"settings":{},"system_permissions":[]}]}`)
 	})
 
 	su, _, err := MeRetrieveUser(context.Background(), client)
