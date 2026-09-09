@@ -20,7 +20,7 @@ const (
 
 	proxyProviderJSON = `{"pk":7,"name":"whoami","authorization_flow":"flow-uuid-authz","invalidation_flow":"flow-uuid-inval","component":"ak-provider-proxy-form","assigned_application_slug":"","assigned_application_name":null,"assigned_backchannel_application_slug":"","assigned_backchannel_application_name":null,"verbose_name":"Proxy Provider","verbose_name_plural":"Proxy Providers","meta_model_name":"authentik_providers_proxy.proxyprovider","client_id":"cid","external_host":"https://whoami.127-0-0-1.sslip.io","redirect_uris":[],"outpost_set":[]}`
 
-	applicationJSON = `{"pk":"app-uuid","name":"whoami","slug":"whoami","provider_obj":null,"backchannel_providers_obj":[],"launch_url":null,"meta_icon_url":null,"meta_icon_themed_urls":{}}`
+	applicationJSON = `{"pk":"app-uuid","pbm_uuid":"pbm-app-uuid","name":"whoami","slug":"whoami","provider_obj":null,"backchannel_providers_obj":[],"launch_url":null,"meta_icon_url":null,"meta_icon_themed_urls":{}}`
 )
 
 // paged wraps result objects in the paginated-list envelope. The list models
