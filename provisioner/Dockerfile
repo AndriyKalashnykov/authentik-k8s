@@ -19,5 +19,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/provisi
 
 FROM gcr.io/distroless/static-debian12:nonroot@sha256:f5b485ea962d9bd1186b2f6b3a061191539b905b82ec395de78cbfae51f20e35
 COPY --from=build /out/provisioner /usr/local/bin/provisioner
-USER nonroot:nonroot
+# Numeric uid/gid (not the "nonroot" name): the base image itself declares
+# User=65532, and Kubernetes runAsNonRoot cannot resolve a username.
+# hadolint DL3066 also requires a numeric user-id.
+USER 65532:65532
 ENTRYPOINT ["/usr/local/bin/provisioner"]

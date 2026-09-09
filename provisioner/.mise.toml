@@ -6,7 +6,7 @@ go = "1.26.5"
 "aqua:golangci/golangci-lint" = "2.12.2"
 "go:golang.org/x/vuln/cmd/govulncheck" = "1.6.0"
 # Dockerfile linter.
-"aqua:hadolint/hadolint" = "2.14.0"
+"aqua:hadolint/hadolint" = "2.15.1"
 # Local Kubernetes (KinD e2e). cloud-provider-kind runs as a pinned host
 # container (see Makefile CLOUD_PROVIDER_KIND_VERSION), not a mise tool.
 "aqua:kubernetes-sigs/kind" = "0.32.0"
