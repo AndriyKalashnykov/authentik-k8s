@@ -13,7 +13,7 @@ go = "1.27.1"
 "aqua:kubernetes/kubectl" = "1.36.2"
 # Helm — used by `make k8s-generate` to regenerate k8s/postgresql from the pinned
 # Authentik chart (templating only; no cluster needed).
-"aqua:helm/helm" = "4.2.4"
+"aqua:helm/helm" = "4.3.0"
 # Security scanners. NOTE the split: gitleaks runs in static-check (via the
 # `secrets` target, so it gates every PR); trivy does NOT -- it runs in
 # `cve-scan` (trivy-fs + vulncheck), which CI executes on version TAGS only.
