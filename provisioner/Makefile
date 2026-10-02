@@ -38,7 +38,7 @@ AUTHENTIK_CHART_VERSION := 2026.8.2
 # image promotion lags the upstream release, so github-releases proposes un-pullable tags.
 # The `# renovate:` line MUST stay immediately above the constant (customManager adjacency).
 # renovate: datasource=docker depName=registry.k8s.io/cloud-provider-kind/cloud-controller-manager extractVersion=^v(?<version>.*)$
-CLOUD_PROVIDER_KIND_VERSION := 0.11.1
+CLOUD_PROVIDER_KIND_VERSION := 0.12.0
 # renovate: datasource=docker depName=kindest/node
 KIND_NODE_IMAGE := kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
 
