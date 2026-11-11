@@ -17,7 +17,7 @@ name: authentik
 
 services:
   traefik:
-    image: traefik:v3.7.17@sha256:f4bb143d1135a579b630ed491e17ec50f6f7c9c6a30585ff3d385471d2a86f5a
+    image: traefik:v3.7.18@sha256:af6e7de981b23d51d8d967e0e508af6a8673f29831138720ab854617fd1b1229
     restart: unless-stopped
     command:
       - --providers.docker=true
