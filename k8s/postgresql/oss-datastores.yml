@@ -54,7 +54,7 @@ spec:
     spec:
       containers:
       - name: postgresql
-        image: postgres:18-alpine@sha256:d3e1620b530c944afa6e887d22eb899824da68e19c52024bf98f5220c88a65b2
+        image: postgres:18-alpine@sha256:ff64c9e3bdf8e2120107d3559de8db314e8305f7e38c5105903c6295876738ff
         imagePullPolicy: IfNotPresent
         env:
         - name: POSTGRES_USER
